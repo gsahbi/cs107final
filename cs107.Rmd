@@ -1,0 +1,32 @@
+---
+title: 'CS107 Final Froject : Sentiment Analysis of Product Reviews'
+author: "Sahbi Ben Gdaiem"
+date: "April 27, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## Loading data for the json files 
+
+```{r cache=True}
+
+# Load the package required to read JSON files.
+library("rjson")
+library("dplyr")
+
+
+# TODO: Set working directory to where this script is (avoid hardcoded paths)
+this.dir <- "/Users/sahbi/HES/CS107/final project/cs107final/"
+setwd(this.dir)
+
+# Give the input file name to the function.
+lines <- readLines("data/reviews_electronics_extract.json")
+df <- data.frame(do.call(rbind,lapply(lines,fromJSON)))
+
+#Preview the result.
+glimpse(df)
+```
