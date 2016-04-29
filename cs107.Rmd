@@ -15,18 +15,169 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r cache=True}
 
 # Load the package required to read JSON files.
-library("rjson")
+library("jsonlite")
 library("dplyr")
-
+library("ggplot2")
 
 # TODO: Set working directory to where this script is (avoid hardcoded paths)
 this.dir <- "/Users/sahbi/HES/CS107/final project/cs107final/"
 setwd(this.dir)
 
-# Give the input file name to the function.
-lines <- readLines("data/reviews_electronics_extract.json")
-df <- data.frame(do.call(rbind,lapply(lines,fromJSON)))
+#big_json_file <- "../amazon/reviews_Electronics.json"
+json_file <- "data/reviews_electronics_extract.json"
+json_file <- "data/reviews_Health_extract.json"
+
+# Load data into dataframe. The file format is NDJSON (Newline Delimited JSON), So stream_in
+# is the approriate way of doing it 
+
+df <- stream_in(file(json_file))
 
 #Preview the result.
 glimpse(df)
 ```
+
+## Exploratory Data Analysis
+
+```{r}
+## checking how many users are there 
+n_distinct(df$reviewerID)
+
+## checking how many products are there
+n_distinct(df$asin)
+
+## looking for the number of ratings per product
+ratings <- df %>% group_by(asin) %>%
+       summarize(n_ratings = n() )
+
+ratings %>%  ggplot(aes(n_ratings)) + 
+  geom_histogram() + 
+  scale_x_log10() +
+  labs(title="Histogram for Ratings per Product") +
+  labs(x="Number of Ratings", y="Count") 
+
+## Let's see the distribution of ratings 
+library(ggplot2)
+
+df %>%  ggplot(aes(overall)) + 
+geom_histogram(binwidth=1,
+               col="red", 
+               fill="green",
+               alpha = .2) + 
+labs(title="Histogram for Ratings per Product") +
+labs(x="Rating Stars", y="number of reviews") 
+
+## TODO : coment on this
+
+```
+
+
+
+
+
+#### Sentiment Analysis (Bag of Words)
+
+One of the simpler things to do with text is to treat each text as a "bag of words.".
+
+```{r}
+library("tidytext")
+sentiments
+```
+
+There are other lexicons in this dataset (see `?sentiments` for more) but we'll use the NRC dataset first. This dataset associates each word with one or more moods, such as "anger", "joy", or "sadness".
+
+```{r}
+bow <- sentiments %>%
+    filter(lexicon == "nrc") %>%
+    select(word, sentiment)
+
+bow
+```
+
+Prepare the text for processing, convert it to lower case
+
+```{r}
+
+dat <- df %>% mutate(reviewText = tolower(reviewText),
+                        summary = tolower(summary),
+                             id = row_number()) %>% 
+              dplyr::select(id, reviewText, overall)
+
+
+# the unnest_tokens function does not remove punctuation in this example "best.I" 
+# so I'll remove them manually before
+
+
+dat$reviewText = gsub( "[\\.\\,]([^ ])", "\\. \\1", dat$reviewText)
+
+```
+
+Experiment with the first 10 reviews before rolling out for the entire set
+
+
+```{r}
+library("tidyr")
+library("stringr")
+
+# tokenize into paragraphs then words using the unnest_tokens
+
+sample <- dat %>% head(1000) 
+
+words_sample <- sample  %>%
+    unnest_tokens(word, reviewText) %>%
+    filter(!word %in% stop_words$word)
+
+# match word-sentiment pairs from bow to our reviewtext. We use inner_join function from dplyr.
+
+words_sentiment <- words_sample %>%
+    inner_join(bow) %>%
+    count(sentiment, id) %>%
+    spread(sentiment, n, fill = 0) %>%
+    mutate(positivity = (positive - negative) / (positive + negative + 1)) %>%
+    select(id, positive, negative, positivity) %>%
+    
+## join back to the intial data frame
+   inner_join(sample)
+
+# positivity metric is a simple classifier ranges from -1 to +1
+# let's check the accuracy of this positivity metric 
+
+words_sentiment %>% ggplot(aes(factor(overall), positivity)) + 
+          geom_boxplot() +labs(x="Sentiment score (Truth)") 
+## the box plot shows that it's a bit tight for this type of classifiers 
+
+
+#library(MASS)
+#bow_lda <- lda(overall ~ positivity, data  = words_sentiment)
+#predict(bow_lda, newdata = words_sentiment)$class
+
+```
+
+Exploring the top words from emotional ratings 5 and 1 stars
+-emotional positive (+2 or 5 stars)
+-rational positive (+1 or 4 stars)
+-neutral (0 or 3 stars)
+-rational negative (−1 or 2 stars)
+-emotional negative (−2 or 1 star)
+
+```{r}
+library("wordcloud")
+
+emo_pos <- dat %>% filter(overall == 5)  %>%
+            unnest_tokens(word, reviewText)  %>%
+            filter(!word %in% stop_words$word) %>%
+            filter(nchar(word) > 2) %>%
+            count(word) 
+
+emo_neg <- dat %>% filter(overall == 1)  %>%
+            unnest_tokens(word, reviewText)  %>%
+            filter(!word %in% stop_words$word) %>%
+            filter(nchar(word) > 2) %>%
+            count(word) 
+
+wordcloud(words = emo_pos$word, freq = emo_pos$n, scale=c(5,0.5), max.words=100, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
+
+wordcloud(words = emo_neg$word, freq = emo_neg$n, scale=c(5,0.5), max.words=100, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
+
+```
+
+
