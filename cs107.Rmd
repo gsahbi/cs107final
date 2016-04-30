@@ -2,17 +2,26 @@
 title: 'CS107 Final Froject : Sentiment Analysis of Product Reviews'
 author: "Sahbi Ben Gdaiem"
 date: "April 27, 2016"
-output: html_document
+output: 
+  html_document: 
+    theme: cerulean
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## Introduction
+
+TODO : introduce the subject, motivation, approach etc..
+
+## Sentiment Analyis
+
+TODO : some theory 
 
 ## Loading data for the json files 
 
-```{r cache=True}
+```{r cache=TRUE}
 
 # Load the package required to read JSON files.
 library("jsonlite")
@@ -39,6 +48,9 @@ glimpse(df)
 ## Exploratory Data Analysis
 
 ```{r}
+library("dplyr")
+library("ggplot2")
+
 ## checking how many users are there 
 n_distinct(df$reviewerID)
 
@@ -66,17 +78,20 @@ geom_histogram(binwidth=1,
 labs(title="Histogram for Ratings per Product") +
 labs(x="Rating Stars", y="number of reviews") 
 
-## TODO : coment on this
 
 ```
 
+> TODO : coment on this
+
 
 The rating system used in Amazon 
--emotional positive (+2 or 5 stars)
--rational positive (+1 or 4 stars)
--neutral (0 or 3 stars)
--rational negative (−1 or 2 stars)
--emotional negative (−2 or 1 star)
+
+* emotional positive (+2 or 5 stars)
+* rational positive (+1 or 4 stars)
+* neutral (0 or 3 stars)
+* rational negative (−1 or 2 stars)
+* emotional negative (−2 or 1 star)
+
 We will collapse the 2 positive ratings (4, 5 stars) into +1 value, and the 2 negative (1, 2 stars) into Negative (-1)  and 3 becomes 0
 
 So at the end we'll have 3 opinions : negative/positive and neutral
@@ -177,18 +192,13 @@ words  %>%
 
 ```
 
+Discover the top words for both positive and negative ratings. We use the `wordcloud` package to have a nice display. 
 
 
-
-Discover the 
-
-
-
-
-```{r}
+```{r warning=FALSE}
 library("wordcloud")
 
-emo_pos <- words %>% filter(rating == 1)  %>%
+emo_pos <- dat %>% filter(rating == 1)  %>%
             unnest_tokens(word, reviewText)  %>%
             filter(!word %in% stop_words$word) %>%
             filter(nchar(word) > 2) %>%
@@ -254,7 +264,30 @@ mat_test <- as.matrix(test)
 
 predicted = predict(classifier, mat_test[,1:11])
 table(as.factor(mat_test[,12]), predicted)
-recall_accuracy(as.factor(mat_test[,12]), predicted)
+
+## calcualte accuracy
+
+accuracy <- function(true_, predicted_) 
+{
+	true_ <- as.vector(true_)
+	predicted_ <- as.vector(predicted_, mode=class(true_))
+	res <- predicted_ == true_
+
+	accuracy <- length(res[res == TRUE])/length(true_)
+	return(accuracy)
+}
+
+accuracy(as.factor(mat_test[,12]), predicted)
+
+## calculate RMSE
+
+RMSE <- function(true_ratings, predicted_ratings){
+    sqrt(mean((true_ratings - predicted_ratings)^2))
+}
+
+
+RMSE(mat_test[,12], as.numeric(predicted))
+
 
 ```
 
