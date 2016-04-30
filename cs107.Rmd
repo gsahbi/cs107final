@@ -25,7 +25,7 @@ setwd(this.dir)
 
 #big_json_file <- "../amazon/reviews_Electronics.json"
 json_file <- "data/reviews_electronics_extract.json"
-json_file <- "data/reviews_Health_extract.json"
+#json_file <- "data/reviews_Health_extract.json"
 
 # Load data into dataframe. The file format is NDJSON (Newline Delimited JSON), So stream_in
 # is the approriate way of doing it 
@@ -71,10 +71,43 @@ labs(x="Rating Stars", y="number of reviews")
 ```
 
 
+The rating system used in Amazon 
+-emotional positive (+2 or 5 stars)
+-rational positive (+1 or 4 stars)
+-neutral (0 or 3 stars)
+-rational negative (−1 or 2 stars)
+-emotional negative (−2 or 1 star)
+We will collapse the 2 positive ratings (4, 5 stars) into +1 value, and the 2 negative (1, 2 stars) into Negative (-1)  and 3 becomes 0
+
+So at the end we'll have 3 opinions : negative/positive and neutral
+
+```{r}
+overall <-seq(1,5)
+rating <- c(-1,-1,0,1,1)
+trans <- data.frame(cbind(overall, rating))
+
+df2 <- df %>% inner_join(trans) %>% select(-overall)
+
+```
+
+
+Let's check again the distribution of opinions
+
+```{r}
+df2 %>%  ggplot(aes(rating)) + 
+geom_histogram(binwidth=1,
+               col="red", 
+               fill="green",
+               alpha = .2) + 
+labs(title="Histogram for Ratings per Product") +
+labs(x="Rating Stars", y="number of reviews") 
+
+```
 
 
 
-#### Sentiment Analysis (Bag of Words)
+
+## Sentiment Analysis (Bag of Words)
 
 One of the simpler things to do with text is to treat each text as a "bag of words.".
 
@@ -96,11 +129,12 @@ bow
 Prepare the text for processing, convert it to lower case
 
 ```{r}
+library("stringr")
 
-dat <- df %>% mutate(reviewText = tolower(reviewText),
+dat <- df2 %>% mutate(reviewText = tolower(reviewText),
                         summary = tolower(summary),
                              id = row_number()) %>% 
-              dplyr::select(id, reviewText, overall)
+              dplyr::select(id, reviewText, rating)
 
 
 # the unnest_tokens function does not remove punctuation in this example "best.I" 
@@ -111,64 +145,56 @@ dat$reviewText = gsub( "[\\.\\,]([^ ])", "\\. \\1", dat$reviewText)
 
 ```
 
-Experiment with the first 10 reviews before rolling out for the entire set
 
+Now start by tokenizing the text of each review from the bag of words
 
 ```{r}
 library("tidyr")
-library("stringr")
+library("tidytext")
 
 # tokenize into paragraphs then words using the unnest_tokens
-
-sample <- dat %>% head(1000) 
-
-words_sample <- sample  %>%
-    unnest_tokens(word, reviewText) %>%
-    filter(!word %in% stop_words$word)
-
 # match word-sentiment pairs from bow to our reviewtext. We use inner_join function from dplyr.
 
-words_sentiment <- words_sample %>%
+words <- dat  %>%
+    unnest_tokens(word, reviewText) %>%
+    filter(!word %in% stop_words$word) %>%
     inner_join(bow) %>%
     count(sentiment, id) %>%
     spread(sentiment, n, fill = 0) %>%
-    mutate(positivity = (positive - negative) / (positive + negative + 1)) %>%
-    select(id, positive, negative, positivity) %>%
+##   mutate(positivity = (positive - negative) / (positive + negative + 1)) %>%
     
 ## join back to the intial data frame
-   inner_join(sample)
-
-# positivity metric is a simple classifier ranges from -1 to +1
-# let's check the accuracy of this positivity metric 
-
-words_sentiment %>% ggplot(aes(factor(overall), positivity)) + 
-          geom_boxplot() +labs(x="Sentiment score (Truth)") 
-## the box plot shows that it's a bit tight for this type of classifiers 
+   inner_join(dat) %>%
+   select(-reviewText)
 
 
-#library(MASS)
-#bow_lda <- lda(overall ~ positivity, data  = words_sentiment)
-#predict(bow_lda, newdata = words_sentiment)$class
+## if we consider only negative and positive features as  predictors
+
+words  %>%
+    ggplot(aes(positive, negative, color=factor(rating))) + 
+    geom_jitter() # + scale_x_log10() + scale_y_log10()
+
 
 ```
 
-Exploring the top words from emotional ratings 5 and 1 stars
--emotional positive (+2 or 5 stars)
--rational positive (+1 or 4 stars)
--neutral (0 or 3 stars)
--rational negative (−1 or 2 stars)
--emotional negative (−2 or 1 star)
+
+
+
+Discover the 
+
+
+
 
 ```{r}
 library("wordcloud")
 
-emo_pos <- dat %>% filter(overall == 5)  %>%
+emo_pos <- words %>% filter(rating == 1)  %>%
             unnest_tokens(word, reviewText)  %>%
             filter(!word %in% stop_words$word) %>%
             filter(nchar(word) > 2) %>%
             count(word) 
 
-emo_neg <- dat %>% filter(overall == 1)  %>%
+emo_neg <- dat %>% filter(rating == -1)  %>%
             unnest_tokens(word, reviewText)  %>%
             filter(!word %in% stop_words$word) %>%
             filter(nchar(word) > 2) %>%
@@ -180,4 +206,55 @@ wordcloud(words = emo_neg$word, freq = emo_neg$n, scale=c(5,0.5), max.words=100,
 
 ```
 
+
+
+
+
+
+
+
+
+
+Now that we know some basic facts about our data set, 
+let's randomly split the data into training and test data. 
+We set the seed `set.seed(755)` and use `sample()` function to select 
+your test index to create two separate data frames
+called: `train` and `test` from the original `ratings` data frame. 
+ `test` contains a randomly selected 10% of the rows and training the other 90%. We will 
+use these data frames to do the rest of the analyses in the problem set.
+
+
+```{r}
+
+set.seed(755)
+# sample from 1 to the length of words
+test_sample <- sample(1:nrow(words), nrow(words)/10) 
+test <- words[test_sample,]
+train <- words[-test_sample,]
+# just checking the dimensions
+nrow(train) / nrow(test)
+#rm(words)
+```
+
+
+Now, we can train the naive Bayes model with the training set. We'll be using e1071 package made by David Meyer from TU Wien.
+The naiveBayes function requires a 
+
+```{r}
+library("e1071")
+mat_train <- as.matrix(train)
+
+# train the model
+classifier = naiveBayes(mat_train[,1:11],   ## these are being the features
+                        as.factor(mat_train[,12]) )  ## this is the truth y
+
+# test the validity
+mat_test <- as.matrix(test)
+
+
+predicted = predict(classifier, mat_test[,1:11])
+table(as.factor(mat_test[,12]), predicted)
+recall_accuracy(as.factor(mat_test[,12]), predicted)
+
+```
 
