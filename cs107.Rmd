@@ -32,59 +32,83 @@ library("ggplot2")
 this.dir <- "/Users/sahbi/HES/CS107/final project/cs107final/"
 setwd(this.dir)
 
-#big_json_file <- "../amazon/reviews_Electronics.json"
 json_file <- "data/reviews_electronics_extract.json"
-#json_file <- "data/reviews_Health_extract.json"
+#json_file <- "data/reviews_elect_100K.json.gz"
 
 # Load data into dataframe. The file format is NDJSON (Newline Delimited JSON), So stream_in
 # is the approriate way of doing it 
 
-df <- stream_in(file(json_file))
+dat <- stream_in(gzfile(json_file), verbose = FALSE)
 
 #Preview the result.
-glimpse(df)
+glimpse(dat)
 ```
 
-## Exploratory Data Analysis
+## Data Wrangling and Preparation
+
+Prepare the text for processing, convert it to lower case, and keep only relevant columns.
+We then garbage collect the old df
 
 ```{r}
 library("dplyr")
+
+df <- dat %>% mutate(reviewText = tolower(summary),
+                       ## summary = tolower(summary),
+                             id = row_number()) %>% 
+              dplyr::select(id, reviewText, overall)
+#rm(dat)
+gc()
+```
+
+
+The `unnest_tokens` function does not remove punctuation in this example "best.I" 
+so I'll remove them manually using `gsub` from the `stringr` package.
+
+```{r}
+library("stringr")
+
+df$reviewText = gsub( "([\\.\\,\\!\\?])([^ ]+)", "\\1 \\2", df$reviewText)
+```
+
+
+## Exploratory Data Analysis
+
+
+```{r}
 library("ggplot2")
 
 ## checking how many users are there 
-n_distinct(df$reviewerID)
+n_distinct(dat$reviewerID)
 
 ## checking how many products are there
-n_distinct(df$asin)
+n_distinct(dat$asin)
 
 ## looking for the number of ratings per product
-ratings <- df %>% group_by(asin) %>%
-       summarize(n_ratings = n() )
-
-ratings %>%  ggplot(aes(n_ratings)) + 
-  geom_histogram() + 
-  scale_x_log10() +
-  labs(title="Histogram for Ratings per Product") +
-  labs(x="Number of Ratings", y="Count") 
+dat %>% group_by(asin) %>%
+        summarize(n_ratings = n() ) %>% 
+        ggplot(aes(n_ratings)) + 
+        geom_histogram() + 
+        scale_x_log10() +
+        labs(title="Histogram for Ratings per Product") +
+        labs(x="Number of Ratings", y="Count") 
 
 ## Let's see the distribution of ratings 
-library(ggplot2)
 
-df %>%  ggplot(aes(overall)) + 
+dat %>%  ggplot(aes(overall)) + 
 geom_histogram(binwidth=1,
                col="red", 
                fill="green",
                alpha = .2) + 
-labs(title="Histogram for Ratings per Product") +
-labs(x="Rating Stars", y="number of reviews") 
+                labs(title="Histogram for Ratings per Product") +
+                labs(x="Rating Stars", y="number of reviews") 
 
-
+mean(dat$overall)
+# the data is very skewed towards positive feedback. Which is an indication that Amazon is not selling junk at least but it's not going to help in our prediction.
 ```
 
-> TODO : coment on this
+## Design Decisions
 
-
-The rating system used in Amazon 
+The rating system used in Amazon is as follows : 
 
 * emotional positive (+2 or 5 stars)
 * rational positive (+1 or 4 stars)
@@ -92,25 +116,26 @@ The rating system used in Amazon
 * rational negative (−1 or 2 stars)
 * emotional negative (−2 or 1 star)
 
-We will collapse the 2 positive ratings (4, 5 stars) into +1 value, and the 2 negative (1, 2 stars) into Negative (-1)  and 3 becomes 0
+We objectively chose to demarcate each rating at the 2.x level divide, such that star ratings above this level would be marked as “1” and star ratings below this level would be marked as “0” 
 
-So at the end we'll have 3 opinions : negative/positive and neutral
+We will collapse the 3, 4 and 5 stars ratings into “1” value, and the 1 and 2 stars ratings into Negative “0”
+
+So at the end we'll have only 2 opinions : negative/positive
+The simplest way to do this is by joining a mapping matrix
 
 ```{r}
 overall <-seq(1,5)
-rating <- c(-1,-1,0,1,1)
+rating <- c(0,0,1,1,1)
 trans <- data.frame(cbind(overall, rating))
 
-df2 <- df %>% inner_join(trans) %>% select(-overall)
-
+df <- df %>% inner_join(trans) %>% dplyr::select(-overall)
 ```
-
 
 Let's check again the distribution of opinions
 
 ```{r}
-df2 %>%  ggplot(aes(rating)) + 
-geom_histogram(binwidth=1,
+df %>%  ggplot(aes(rating)) + 
+        geom_histogram(binwidth=1,
                col="red", 
                fill="green",
                alpha = .2) + 
@@ -119,6 +144,34 @@ labs(x="Rating Stars", y="number of reviews")
 
 ```
 
+Even after this mapping the class proportions need to be corrected manually.
+We calculate the skew (disproportion rate)
+
+```{r}
+sum(df$rating == 0) / sum(df$rating == 1)
+n_remov <- sum(df$rating == 1) - sum(df$rating == 0)
+```
+
+we have 3x more Positive than Negative. Let's remove 2/3 of Positive to adjust the proportions
+
+```{r}
+positive_ids <- df$id[df$rating == 1]
+remove_ids <-  sample(positive_ids, n_remov)
+
+## remove these rows
+df3 <- df[-remove_ids,]
+```
+
+Check the numbers, we are good to go :
+
+```{r}
+sum(df3$rating == 0) / sum(df3$rating == 1)
+
+## clean up things
+df <- df3
+rm(df3, df2, dat, positive_ids, remove_ids)
+gc()
+```
 
 
 
@@ -136,60 +189,63 @@ There are other lexicons in this dataset (see `?sentiments` for more) but we'll 
 ```{r}
 bow <- sentiments %>%
     filter(lexicon == "nrc") %>%
-    select(word, sentiment)
+    dplyr::select(word, sentiment)
 
 bow
 ```
 
-Prepare the text for processing, convert it to lower case
-
-```{r}
-library("stringr")
-
-dat <- df2 %>% mutate(reviewText = tolower(reviewText),
-                        summary = tolower(summary),
-                             id = row_number()) %>% 
-              dplyr::select(id, reviewText, rating)
 
 
-# the unnest_tokens function does not remove punctuation in this example "best.I" 
-# so I'll remove them manually before
-
-
-dat$reviewText = gsub( "[\\.\\,]([^ ])", "\\. \\1", dat$reviewText)
-
-```
-
-
-Now start by tokenizing the text of each review from the bag of words
+Now start by tokenizing the text of each review from the bag of words. Tokenize into words using the unnest_tokens  function.
+Then match word-sentiment pairs from `bow` to our reviewtext. We use inner_join function from dplyr.
 
 ```{r}
 library("tidyr")
 library("tidytext")
 
-# tokenize into paragraphs then words using the unnest_tokens
-# match word-sentiment pairs from bow to our reviewtext. We use inner_join function from dplyr.
-
-words <- dat  %>%
+words <- df %>%
     unnest_tokens(word, reviewText) %>%
     filter(!word %in% stop_words$word) %>%
     inner_join(bow) %>%
     count(sentiment, id) %>%
-    spread(sentiment, n, fill = 0) %>%
-##   mutate(positivity = (positive - negative) / (positive + negative + 1)) %>%
-    
+    spread(sentiment, n, fill = 0)
+
 ## join back to the intial data frame
-   inner_join(dat) %>%
-   select(-reviewText)
+words <- df %>% inner_join(words, by="id")  %>% dplyr::select(-reviewText, -id)
+
+## reorder columns and rename rating as `y`
+colnames(words)[1] <- "y"
+```
+
+TF-IDF
+
+Compute tf-idf, inverse document frequency, and relative term frequency on document-feature matrices
+
+```{r}
+d <- words %>% dplyr::select(-y)
+tf <- d
+idf <- nrow(d)/colSums(d)
+tfidf <- d
+
+for(word in names(idf)){
+  tfidf[,word] <- tf[,word] * idf[word]
+}
+
+tfidf <- tfidf %>% mutate(y=words$y) 
+nc <- ncol(tfidf)
+
+words <- tfidf[, c(nc, 1:(nc-1))]
+```
 
 
-## if we consider only negative and positive features as  predictors
 
+
+If we consider only negative and positive features as predictors let's see how it looks
+
+```{r}
 words  %>%
-    ggplot(aes(positive, negative, color=factor(rating))) + 
-    geom_jitter() # + scale_x_log10() + scale_y_log10()
-
-
+    ggplot(aes(positive, negative, color=factor(y))) + 
+    geom_point() # + scale_x_log10() + scale_y_log10()
 ```
 
 Discover the top words for both positive and negative ratings. We use the `wordcloud` package to have a nice display. 
@@ -198,13 +254,13 @@ Discover the top words for both positive and negative ratings. We use the `wordc
 ```{r warning=FALSE}
 library("wordcloud")
 
-emo_pos <- dat %>% filter(rating == 1)  %>%
+emo_pos <- df %>% filter(rating == 1)  %>%
             unnest_tokens(word, reviewText)  %>%
             filter(!word %in% stop_words$word) %>%
             filter(nchar(word) > 2) %>%
             count(word) 
 
-emo_neg <- dat %>% filter(rating == -1)  %>%
+emo_neg <- df %>% filter(rating == 0)  %>%
             unnest_tokens(word, reviewText)  %>%
             filter(!word %in% stop_words$word) %>%
             filter(nchar(word) > 2) %>%
@@ -217,36 +273,27 @@ wordcloud(words = emo_neg$word, freq = emo_neg$n, scale=c(5,0.5), max.words=100,
 ```
 
 
-
-
-
-
-
-
-
+## Supervised training
 
 Now that we know some basic facts about our data set, 
 let's randomly split the data into training and test data. 
 We set the seed `set.seed(755)` and use `sample()` function to select 
 your test index to create two separate data frames
 called: `train` and `test` from the original `ratings` data frame. 
- `test` contains a randomly selected 10% of the rows and training the other 90%. We will 
+ `test` contains a randomly selected 20% of the rows and training the other 80%. We will 
 use these data frames to do the rest of the analyses in the problem set.
 
 
 ```{r}
 
-set.seed(755)
+set.seed(123)
 # sample from 1 to the length of words
-test_sample <- sample(1:nrow(words), nrow(words)/10) 
+test_sample <- sample(1:nrow(words), nrow(words)/5) 
 test <- words[test_sample,]
 train <- words[-test_sample,]
 # just checking the dimensions
 nrow(train) / nrow(test)
-#rm(words)
 ```
-
-
 
 ### Naive Bayes supervised training 
 
@@ -265,21 +312,23 @@ The naiveBayes function requires a
 
 ```{r}
 library("e1071")
+library("MASS")
+library(caret)
+
+# transform into matrices
 mat_train <- as.matrix(train)
-
-# train the model
-classifier = naiveBayes(mat_train[,1:11],   ## these are being the features
-                        as.factor(mat_train[,12]) )  ## this is the truth y
-
-# test the validity
 mat_test <- as.matrix(test)
 
+# train the model
+nb.model = naiveBayes(mat_train[,-1],   ## these are being the features
+                      as.factor(mat_train[,1]) )  ## this is the truth y
 
-predicted = predict(classifier, mat_test[,1:11])
-table(as.factor(mat_test[,12]), predicted)
+nb.pred = predict(nb.model, mat_test[,-1])
+
+# calcualte the confusion matrix
+table(as.factor(mat_test[,1]), nb.pred)
 
 ## calcualte accuracy
-
 accuracy <- function(true_, predicted_) 
 {
 	true_ <- as.vector(true_)
@@ -290,7 +339,7 @@ accuracy <- function(true_, predicted_)
 	return(accuracy)
 }
 
-accuracy(as.factor(mat_test[,12]), predicted)
+accuracy(as.factor(mat_test[,1]), nb.pred)
 
 ## calculate RMSE
 
@@ -299,7 +348,7 @@ RMSE <- function(true_ratings, predicted_ratings){
 }
 
 
-RMSE(mat_test[,12], as.numeric(predicted))
+RMSE(mat_test[,1], as.numeric(nb.pred))
 
 
 ```
@@ -307,19 +356,90 @@ RMSE(mat_test[,12], as.numeric(predicted))
 
 ### Support Vector Machine 
 
-SVMs were developed by Cortes & Vapnik (1995) for binary classification. Their
-approach may be roughly sketched as follows:
+SVMs were developed by Cortes & Vapnik (1995) for binary classification. Their approach may be roughly sketched as follows:
 > Class separation: basically, we are looking for the optimal separating hyperplane between the two classes by maximizing the margin between the classes’ closest points —the points lying on the boundaries are called support vectors, and the middle of the margin is our optimal separating hyperplane;
 
 ```{r}
+
 ## svm
-svm.model <- svm(mat_train[,-12],           ## these are being the features
-                 as.factor(mat_train[,12]),  ## this is the truth y
-                 cost = 1, gamma = 1)
-svm.pred <- predict(svm.model, mat_train[,-12])
+svm.model <- svm(mat_train[,-1],           ## these are being the features
+                 as.factor(mat_train[,1]),  ## this is the truth y
+                 cost = 5, gamma = 1)
+svm.pred <- predict(svm.model, mat_test[,-1])
 
 ## compute svm confusion matrix
-table(as.factor(mat_test[,12]), svm.pred)
+table(as.factor(mat_test[,1]), svm.pred)
+
+## compute svm accuracy
+accuracy(as.factor(mat_test[,1]), svm.pred)
 
 ```
+
+## Logistic regression
+
+```{r}
+
+## glm
+glm.model <- glm(y~., data=train, family=binomial)
+
+glm.pred <- predict(glm.model, newdata=test, type="response") 
+summary(glm.model)
+
+## compute lr confusion matrix assuming a cutoff at 0.5
+table(test$y, glm.pred>.5) 
+
+## compute lr accuracy
+accuracy(test$y, glm.pred>.5)
+
+```
+
+In the previous model we were assuming a less optimal cut-off. Let's use LDA assuming of course that our covariates are bivariate normal
+
+
+```{r}
+
+
+lda.model <- lda(y ~ ., train)
+ 
+plda = predict(lda.model, newdata = test, type="response")
+
+## compute lr confusion matrix assuming a cutoff at 0.5
+lda.tab <- table(test$y, plda$class)
+ 
+confusionMatrix(lda.tab , positive="1")
+
+```
+
+
+Checking RoC curve
+
+
+```{r}
+
+library(pROC)
+roc_qda <- roc(test$y, glm.pred)
+plot(roc_qda)
+```
+
+Cross-Validation of Logistic Regression
+
+```{r}
+
+library(caret)
+
+# define training control
+train_control <- trainControl(method="cv", number=10)
+words <- mutate(words, y = factor(y))
+# train the model
+model <- train(y ~ .,
+             data = words,
+             method = "lda",
+             trControl = train_control,
+             tuneLength = 1, # How fine a mesh to go on grid
+             #tuneGrid=data.frame(k=seq(1,3,1)),
+             metric="Accuracy")
+# summarize results
+print(model)
+```
+
 
