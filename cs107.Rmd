@@ -247,6 +247,19 @@ nrow(train) / nrow(test)
 ```
 
 
+
+### Naive Bayes supervised training 
+
+The basic idea to find the probabilities of categories given a text document by using the joint probabilities of words and categories. It is based on the assumption of word independence.
+The starting point is the Bayes theorem for conditional probability, stating that, for a given data point x and class C: 
+
+$P(C/x) = \frac{P(x/C) \cdot P(C)}{P(x)}$
+
+By making the assumption that for a data point x = {x1,x2,…xj}, the probability of each of its attributes occurring in a given class is independent, we can estimate the probability of x as follows :
+
+P(C/x) = P(C) \cdot \prod_{j} P(x_{j}/C)
+
+
 Now, we can train the naive Bayes model with the training set. We'll be using e1071 package made by David Meyer from TU Wien.
 The naiveBayes function requires a 
 
@@ -288,6 +301,25 @@ RMSE <- function(true_ratings, predicted_ratings){
 
 RMSE(mat_test[,12], as.numeric(predicted))
 
+
+```
+
+
+### Support Vector Machine 
+
+SVMs were developed by Cortes & Vapnik (1995) for binary classification. Their
+approach may be roughly sketched as follows:
+> Class separation: basically, we are looking for the optimal separating hyperplane between the two classes by maximizing the margin between the classes’ closest points —the points lying on the boundaries are called support vectors, and the middle of the margin is our optimal separating hyperplane;
+
+```{r}
+## svm
+svm.model <- svm(mat_train[,-12],           ## these are being the features
+                 as.factor(mat_train[,12]),  ## this is the truth y
+                 cost = 1, gamma = 1)
+svm.pred <- predict(svm.model, mat_train[,-12])
+
+## compute svm confusion matrix
+table(as.factor(mat_test[,12]), svm.pred)
 
 ```
 
