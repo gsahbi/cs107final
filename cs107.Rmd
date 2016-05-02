@@ -1,10 +1,8 @@
 ---
 title: 'CS107 Final Froject : Sentiment Analysis of Product Reviews'
-author: "Sahbi Ben Gdaiem"
+author: "Sahbi Ben Gdaiem, Mohammed Hadj-Ali"
 date: "April 27, 2016"
-output: 
-  html_document: 
-    theme: cerulean
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
@@ -19,55 +17,66 @@ TODO : introduce the subject, motivation, approach etc..
 
 TODO : some theory 
 
-## Loading data for the json files 
+
+```{r message=FALSE,echo=FALSE}
+# Load the packages required
+library("jsonlite")    ##  loading JSON data input 
+library("stringr")     ##  gsub
+library("knitr")       ##  kable
+library("ggplot2")     ##  for plots
+library("dplyr")       ##  for dataframe wrangling
+library("randomForest") #  for randomForest classification
+library("caret")       ##
+library("e1071")       ##  for naive bayes and SVM 
+library("MASS")        ##   
+library("wordcloud")   ##  word cloud
+library("tidyr")       ##  
+library("tidytext")    ##  tokenizer and sentiment dataset
+library("pROC")        ##  for RoC
+```
+
+## Data Wrangling and Preparation
+
+### Load data
 
 ```{r cache=TRUE}
-
-# Load the package required to read JSON files.
-library("jsonlite")
-library("dplyr")
-library("ggplot2")
 
 # TODO: Set working directory to where this script is (avoid hardcoded paths)
 this.dir <- "/Users/sahbi/HES/CS107/final project/cs107final/"
 setwd(this.dir)
 
-json_file <- "data/reviews_electronics_extract.json"
-#json_file <- "data/reviews_elect_100K.json.gz"
+#json_file <- "data/reviews_electronics_extract.json"
+json_file <- "data/reviews_elect_100K.json.gz"
+```
 
-# Load data into dataframe. The file format is NDJSON (Newline Delimited JSON), So stream_in
-# is the approriate way of doing it 
 
+The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the approriate way of to load the data into a data frame.
+
+```{r}
 dat <- stream_in(gzfile(json_file), verbose = FALSE)
 
 #Preview the result.
 glimpse(dat)
 ```
 
-## Data Wrangling and Preparation
+### Data wrangling
 
 Prepare the text for processing, convert it to lower case, and keep only relevant columns.
 We then garbage collect the old df
 
 ```{r}
-library("dplyr")
 
-df <- dat %>% mutate(reviewText = tolower(summary),
-                       ## summary = tolower(summary),
-                             id = row_number()) %>% 
-              dplyr::select(id, reviewText, overall)
-#rm(dat)
-gc()
+df <- dat %>% mutate(reviewText = tolower(summary)) %>% 
+              dplyr::select(reviewText, overall)
+
 ```
-
 
 The `unnest_tokens` function does not remove punctuation in this example "best.I" 
 so I'll remove them manually using `gsub` from the `stringr` package.
 
 ```{r}
-library("stringr")
-
-df$reviewText = gsub( "([\\.\\,\\!\\?])([^ ]+)", "\\1 \\2", df$reviewText)
+df$reviewText = gsub( "([[:punct:]])([^ ]+)", "\\1 \\2", df$reviewText)
+df %>% head(10) %>% kable
 ```
 
 
@@ -75,7 +84,6 @@ df$reviewText = gsub( "([\\.\\,\\!\\?])([^ ]+)", "\\1 \\2", df$reviewText)
 
 
 ```{r}
-library("ggplot2")
 
 ## checking how many users are there 
 n_distinct(dat$reviewerID)
@@ -128,8 +136,13 @@ overall <-seq(1,5)
 rating <- c(0,0,1,1,1)
 trans <- data.frame(cbind(overall, rating))
 
-df <- df %>% inner_join(trans) %>% dplyr::select(-overall)
+df <- df %>% 
+      filter(overall != 3)  %>% 
+      inner_join(trans) %>% 
+      dplyr::select(-overall) %>% 
+      mutate(id = row_number())
 ```
+
 
 Let's check again the distribution of opinions
 
@@ -169,39 +182,31 @@ sum(df3$rating == 0) / sum(df3$rating == 1)
 
 ## clean up things
 df <- df3
-rm(df3, df2, dat, positive_ids, remove_ids)
+rm(df3, dat, positive_ids, remove_ids)
 gc()
 ```
 
 
+## Feature Extraction and Classification (Bag of Words)
 
-## Sentiment Analysis (Bag of Words)
-
-One of the simpler things to do with text is to treat each text as a "bag of words.".
+One of the simpler things to do with text is to treat each text as a "bag of words". We'll use the `tidytext` package's classification of sentiments dataset.
 
 ```{r}
-library("tidytext")
 sentiments
 ```
 
-There are other lexicons in this dataset (see `?sentiments` for more) but we'll use the NRC dataset first. This dataset associates each word with one or more moods, such as "anger", "joy", or "sadness".
+This dataset associates each word with one or more moods, such as "anger", "joy", or "sadness".
 
 ```{r}
 bow <- sentiments %>%
     filter(lexicon == "nrc") %>%
     dplyr::select(word, sentiment)
-
-bow
 ```
-
-
 
 Now start by tokenizing the text of each review from the bag of words. Tokenize into words using the unnest_tokens  function.
 Then match word-sentiment pairs from `bow` to our reviewtext. We use inner_join function from dplyr.
 
 ```{r}
-library("tidyr")
-library("tidytext")
 
 words <- df %>%
     unnest_tokens(word, reviewText) %>%
@@ -215,11 +220,19 @@ words <- df %>% inner_join(words, by="id")  %>% dplyr::select(-reviewText, -id)
 
 ## reorder columns and rename rating as `y`
 colnames(words)[1] <- "y"
+
+
 ```
 
 TF-IDF
 
 Compute tf-idf, inverse document frequency, and relative term frequency on document-feature matrices
+
+$$tf(t,d) = \frac{f_{d}(t)}{\underset{w \in d}{max}}$$
+$$idf(t,D) =\frac{|D|}{|d \in D : t \in d|}$$
+$$tfidf(t,d,D)=tf(t,d)\cdot idf(t,D)$$
+$$f_d(t) := freqency\ of\ term\ t\ in\ document\ d$$
+$$D := corpus\ of\ documents$$
 
 ```{r}
 d <- words %>% dplyr::select(-y)
@@ -238,21 +251,18 @@ words <- tfidf[, c(nc, 1:(nc-1))]
 ```
 
 
-
-
 If we consider only negative and positive features as predictors let's see how it looks
 
 ```{r}
 words  %>%
     ggplot(aes(positive, negative, color=factor(y))) + 
-    geom_point() # + scale_x_log10() + scale_y_log10()
+    geom_jitter() # + scale_x_log10() + scale_y_log10()
 ```
 
 Discover the top words for both positive and negative ratings. We use the `wordcloud` package to have a nice display. 
 
 
 ```{r warning=FALSE}
-library("wordcloud")
 
 emo_pos <- df %>% filter(rating == 1)  %>%
             unnest_tokens(word, reviewText)  %>%
@@ -266,7 +276,15 @@ emo_neg <- df %>% filter(rating == 0)  %>%
             filter(nchar(word) > 2) %>%
             count(word) 
 
+layout(matrix(c(1:4), nrow=2, ncol = 2), heights=c(1, 4))
+par(mar=rep(0, 4))
+plot.new()
+text(x=0.5, y=0.5, "Positive words", cex=2)
+
 wordcloud(words = emo_pos$word, freq = emo_pos$n, scale=c(5,0.5), max.words=100, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
+
+plot.new()
+text(x=0.5, y=0.5, "Negative words", cex=2)
 
 wordcloud(words = emo_neg$word, freq = emo_neg$n, scale=c(5,0.5), max.words=100, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
 
@@ -295,25 +313,28 @@ train <- words[-test_sample,]
 nrow(train) / nrow(test)
 ```
 
+As we go along we will be comparing different approaches. Let's start by creating a benchmark table:
+
+```{r}
+benchmark <- data_frame()
+```
+
 ### Naive Bayes supervised training 
 
 The basic idea to find the probabilities of categories given a text document by using the joint probabilities of words and categories. It is based on the assumption of word independence.
 The starting point is the Bayes theorem for conditional probability, stating that, for a given data point x and class C: 
 
-$P(C/x) = \frac{P(x/C) \cdot P(C)}{P(x)}$
+$$P(C/x) = \frac{P(x/C) \cdot P(C)}{P(x)}$$
 
 By making the assumption that for a data point x = {x1,x2,…xj}, the probability of each of its attributes occurring in a given class is independent, we can estimate the probability of x as follows :
 
-P(C/x) = P(C) \cdot \prod_{j} P(x_{j}/C)
+$$P(C/x) = P(C) \cdot \prod_{j} P(x_{j}/C)$$
 
 
 Now, we can train the naive Bayes model with the training set. We'll be using e1071 package made by David Meyer from TU Wien.
 The naiveBayes function requires a 
 
 ```{r}
-library("e1071")
-library("MASS")
-library(caret)
 
 # transform into matrices
 mat_train <- as.matrix(train)
@@ -339,14 +360,17 @@ accuracy <- function(true_, predicted_)
 	return(accuracy)
 }
 
-accuracy(as.factor(mat_test[,1]), nb.pred)
+nb.accuracy <- accuracy(as.factor(mat_test[,1]), nb.pred) ; nb.accuracy
+
+benchmark <- bind_rows(benchmark,
+                          data_frame(method="Naive Bayes",  
+                                     accu = nb.accuracy ))
 
 ## calculate RMSE
 
 RMSE <- function(true_ratings, predicted_ratings){
     sqrt(mean((true_ratings - predicted_ratings)^2))
 }
-
 
 RMSE(mat_test[,1], as.numeric(nb.pred))
 
@@ -356,8 +380,10 @@ RMSE(mat_test[,1], as.numeric(nb.pred))
 
 ### Support Vector Machine 
 
-SVMs were developed by Cortes & Vapnik (1995) for binary classification. Their approach may be roughly sketched as follows:
+SVMs were developed by Cortes & Vapnik (1995) [1] for binary classification. Their approach may be roughly sketched as follows:
 > Class separation: basically, we are looking for the optimal separating hyperplane between the two classes by maximizing the margin between the classes’ closest points —the points lying on the boundaries are called support vectors, and the middle of the margin is our optimal separating hyperplane;
+
+[1] : Cortes, C. & Vapnik, V. (1995). Support-vector network. Machine Learning, 20, 1–25
 
 ```{r}
 
@@ -371,8 +397,11 @@ svm.pred <- predict(svm.model, mat_test[,-1])
 table(as.factor(mat_test[,1]), svm.pred)
 
 ## compute svm accuracy
-accuracy(as.factor(mat_test[,1]), svm.pred)
+svm.accuracy <- accuracy(as.factor(mat_test[,1]), svm.pred) ; svm.accuracy
 
+benchmark <- bind_rows(benchmark,
+                          data_frame(method="Support Vector Machine",  
+                                     accu = svm.accuracy ))
 ```
 
 ## Logistic regression
@@ -406,8 +435,12 @@ plda = predict(lda.model, newdata = test, type="response")
 ## compute lr confusion matrix assuming a cutoff at 0.5
 lda.tab <- table(test$y, plda$class)
  
-confusionMatrix(lda.tab , positive="1")
+lda.accuracy <- confusionMatrix(lda.tab , positive="1")$overall[[1]];lda.accuracy
 
+
+benchmark <- bind_rows(benchmark,
+                          data_frame(method="Linear Discriminent Analysis",  
+                                     accu = lda.accuracy ))
 ```
 
 
@@ -416,16 +449,14 @@ Checking RoC curve
 
 ```{r}
 
-library(pROC)
-roc_qda <- roc(test$y, glm.pred)
-plot(roc_qda)
+roc_ <- roc(test$y, glm.pred)
+plot(roc_)
 ```
 
 Cross-Validation of Logistic Regression
 
 ```{r}
 
-library(caret)
 
 # define training control
 train_control <- trainControl(method="cv", number=10)
@@ -433,7 +464,7 @@ words <- mutate(words, y = factor(y))
 # train the model
 model <- train(y ~ .,
              data = words,
-             method = "lda",
+             method = "glm",
              trControl = train_control,
              tuneLength = 1, # How fine a mesh to go on grid
              #tuneGrid=data.frame(k=seq(1,3,1)),
@@ -442,4 +473,103 @@ model <- train(y ~ .,
 print(model)
 ```
 
+# Dimension reduction using PCA
+
+Let's try to extract the Principal Components that maximize variance
+
+```{r, cache=TRUE}
+X <- mat_train[,-1]
+pc <- prcomp(X, center = FALSE, scale = FALSE)
+```
+
+And explore the variance of PCs:
+We can see there that the first 6 PCs have more than {90\%} of the variance of the data.
+
+```{r}
+plot(pc$sdev^2/sum(pc$sdev^2))
+summary(pc)$importance[,1:6]
+```
+
+By eliminating the neutral class we can visually see some demarcation of negative class.
+Because we are using unigrams, negations such as in "Not good", will be considered positive so the majority of  positive words will contribure to negative.
+That's why we see the positive is overlapping negatives in the graph below:
+
+```{r}
+pcadf <- data.frame(PC1 = pc$x[,1], 
+                    PC2 = pc$x[,2],
+                    class=factor(mat_train[,1])) 
+
+pcadf %>%  ggplot(aes(PC1, PC2, fill=class))+
+           geom_point(cex=2, pch=21)
+```
+
+Use that data to do logistic regression
+
+
+```{r}
+k <- 10
+
+train.pca <- data.frame(y=mat_train[,1], (X %*% pc$rotation[,1:k]))
+test.pca  <- data.frame(y=mat_test[,1], (mat_test[,-1] %*% pc$rotation[,1:k]))
+
+pc.fit <- glm(y ~ ., data=train.pca, family="binomial")
+
+# predict on all data
+
+test.pca.pred <- predict(pc.fit, newdata=test.pca) > 0
+
+## compute confusion matrix 
+table(test$y, test.pca.pred) 
+
+## compute accuracy
+pca.accuracy <- accuracy(test$y, test.pca.pred);pca.accuracy
+
+benchmark <- bind_rows(benchmark,
+                          data_frame(method="PCA with GLM",  
+                                     accu = pca.accuracy ))
+```
+
+
+## Randon Forest 
+
+The `randomForest` prediction function works similarly to decision trees
+
+```{r}
+rf.fit <- randomForest(as.factor(y) ~ ., 
+                       data=train, 
+                       importance=TRUE, 
+                       mtry = 3, 
+                       ntree=2000)
+
+rf.pred <- predict(rf.fit, newdata = test, type="response" )
+
+## compute confusion matrix 
+table(as.factor(test$y), rf.pred ) 
+
+## compute accuracy
+rf.accuracy <- accuracy(as.factor(test$y), rf.pred );rf.accuracy
+
+
+benchmark <- bind_rows(benchmark,
+                          data_frame(method="Random Forest",  
+                                     accu = rf.accuracy ))
+```
+ 
+
+ 
+```{r}
+rf.fit$importance
+rf.pred <- predict(rf.fit, test)
+```
+
+
+## Conclusion
+
+In this study we used a supervised machine learning approach and tried several classification models. From the table below, the algorithmic approach using randomForest gives the best accuracy. we are 25% better than flipping a coin with only a classified bag of words.
+
+
+```{r}
+# summary of 5 methods
+benchmark %>% kable
+```
 
