@@ -39,23 +39,22 @@ In this work we'll work on ML classification and then try to get into the NLP an
 # Specify and load required R packages. 
 libs = c(
   "jsonlite",    ##  loading JSON data input 
-  "tm",          ##  essential, feature extraction and fitting
+  "caret",       ##  confusion matrix
   "stringr",     ##  gsub
   "knitr",       ##  kable
   "ggplot2",     ##  for plots
   "dplyr",       ##  for dataframe wrangling
   "randomForest", #  for randomForest classification
-  "caret",       ##
   "e1071",       ##  for naive bayes and SVM 
   "MASS",        ##   
   "wordcloud",   ##  word cloud
-  "tidyr",       ##  
-  "tidytext",    ##  tokenizer and sentiment dataset
-  "pROC"         ##  for RoC
+  "tidyr",       ##  ubiquitous
+  "tidytext"     ##  tokenizer and sentiment dataset
 )
 
 sapply(libs, require, character.only=TRUE)
 ```
+
 
 ## Data Wrangling and Preparation
 
@@ -71,11 +70,11 @@ We have decided to use electronics reviews for this work. Because electronics ar
 
 ```{r }
 # TODO: Set working directory to where this script is (avoid hardcoded paths)
-this.dir <- "/Users/sahbi/HES/CS107/final project/cs107final/"
+this.dir <- "/mnt/hgfs/final project/cs107final/data/"
 setwd(this.dir)
 
 #json_file <- "data/reviews_electronics_extract.json"
-json_file <- "data/reviews_electronics_extract.json.gz"
+json_file <- "reviews_electronics_extract.json.gz"
 ```
 
 The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the approriate way of to load the data into a data frame.
@@ -83,7 +82,7 @@ The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the ap
 ```{r cache=TRUE}
 dat <- stream_in(gzfile(json_file), verbose = FALSE)
 
-dat <- dat %>% head(100)    ## comment after testing
+#dat <- dat %>% head(2000)    ## comment after testing
 
 #Preview the result.
 glimpse(dat)
@@ -128,7 +127,7 @@ Prepare the text for processing, convert it to lower case, and keep only relevan
 We then garbage collect the old `dat`
 
 ```{r}
-df <- dat %>% mutate(reviewText = reviewText) %>% 
+df <- dat %>% mutate(reviewText = summary) %>% 
               dplyr::select(reviewText, overall)
 # rm(dat)  ## TODO : uncomment for production version
 gc()
@@ -177,12 +176,12 @@ The simplest way to do this is by joining a mapping matrix
 
 ```{r}
 overall <-seq(1,5)
-rating <- c(0,0,1,1,1)
+rating <- c(0,0,0,1,1)
 trans <- data.frame(cbind(overall, rating))
 
 df <- df %>% 
-      filter(overall != 3)  %>% 
-      inner_join(trans) %>% 
+     # filter(overall != 3)  %>% 
+      left_join(trans) %>% 
       dplyr::select(-overall) %>% 
       mutate(id = row_number())
 ```
@@ -228,9 +227,9 @@ rm(df3, dat, positive_ids, remove_ids)
 gc()
 ```
 
-## Machine Learning 
+# Machine Learning Classification
 
-### Bag of Words
+## Bag of Words
 
 One of the simpler things to do with text is to treat each text as a "bag of words". We have used the `tm` package in order to construct a Term Document Matrix but the computer couldn't handle such  huge dimensions. So let's go with `tidytext`
 
@@ -267,7 +266,7 @@ wordcloud(words = emo_neg$word, freq = emo_neg$n, scale=c(5,0.5), max.words=100,
 
 
 
-### Text tidiying
+## Text tidiying
 
 Do a serie of transformations :
 
@@ -289,7 +288,7 @@ bow <- sentiments %>%
 ```
 
 
-### Creating features from Bag of Words
+## Creating features from Bag of Words
 
 Use `unrest_tokens` and join function in order to convert our reviews into a sparse Matrix.
 
@@ -300,11 +299,18 @@ Xdf <- df %>%
     filter(!word %in% stop_words$word) %>%
     inner_join(bow) %>%
     count(word, id) %>%
-    spread(word, n, fill = 0) %>%
-    dplyr::select(-id)
+    spread(word, n, fill = 0)
+
+## join back to save the truth y
+Xdf2 <- df %>% right_join(Xdf, by = "id") 
+
+## save the truth in order:
+Y   <- Xdf2[,2]
+Xdf <- Xdf2 %>% dplyr::select(-c(1:3))
+
 ```
 
-### TF-IDF
+## TF-IDF
 
 Term Frequency - Inverse Document Frequency is term count within a document weighted against the term's ubiquity within the corpus. This weight is based on the principle that terms occurring in almost every document are therefore less specific to an individual document and should be scaled down. 
 So a tf-idf value represents the term's relative importance within a document.
@@ -317,7 +323,7 @@ $$tfidf(t,d,D) = tf(t,d)\cdot idf(t,D)$$
 $$f_d(t) := freqency\ of\ term\ t\ in\ document\ d$$
 $$D : corpus\ of\ documents$$
 $$|D| : number\ of\ documents\ where\ the term\ t\appears $$
-$$|d \in D : t \in d|\ :\ number\ of\ documents\ where\ the\ term\ t\ appears $$
+$$|d \in D : t \in d|\ :\ number\ of\ documents\ where\ the\ term\ t\ appears$$
 
 ```{r}
 
@@ -338,97 +344,84 @@ Xdf <- tfidf(Xdf)
 ```
 
 
-
-### Reduce dimensionality (Single Vector Decomposition)
+## Reduce dimensionality (Single Vector Decomposition)
 
 Suppose we have m words (features) and n documents 
 Single vector decomposition (SVD) of an m*n real or complex matrix X is a factorization of the form :
 
 
-$\mathbf{ X = U \Sigma V^{T} }$
-$ U\ is\ m x r\ matrix,\ columns\ of\ U\ contain\ the\ Eigenvectors\ of\ X \cdot X^{T} $
-$ V\ is\ an\ r x n,\ columns\ of\ V\ contain\ the\ Eigenvectors\ of\ X^{T} \cdot X $
-$ \Sigma\ is\ a\ diagonal\ r x r\ matrix.\ diagonal\ values\ are\ eigenvalues\ of\ X \cdot X^{T}$
+$$\mathbf{ X = U \Sigma V^{T} }$$
+$$ U\ is\ m x r\ matrix,\ columns\ of\ U\ contain\ the\ Eigenvectors\ of\ X \cdot X^{T} $$
+$$ V\ is\ an\ r x n,\ columns\ of\ V\ contain\ the\ Eigenvectors\ of\ X^{T} \cdot X $$
+$$ \Sigma\ is\ a\ diagonal\ r x r\ matrix.\ diagonal\ values\ are\ eigenvalues\ of\ X \cdot X^{T}$$
 
 $$\begin{bmatrix} x_{1,1} & x_{1,2}  & \cdots & x_{1,n} \\ x_{2,1}& \ddots & & \vdots \\ \vdots &  & \ddots & \vdots \\ 
  x_{m,1}& \cdots &  \cdots & x_{m,n} \\ \end{bmatrix}= \begin{bmatrix} u_{1,1} & u_{1,2}  & \cdots & u_{1,r} \\ u_{2,1}& \ddots & & \vdots \\ \vdots &  & \ddots & \vdots \\u_{m,1}& \cdots &  \cdots & u_{m,r} \\\end{bmatrix} \cdot diag \begin{bmatrix}d_{1}\\\vdots \\  \vdots  \\  d_{r} \\ \end{bmatrix}\cdot \begin{bmatrix} v_{1,1} & v_{1,2}  & \cdots & v_{1,n} \\ v_{2,1}& \ddots & & \vdots \\ \vdots &  & \ddots & \vdots \\ v_{r,1}& \cdots &  \cdots & v_{r,n} \\ \end{bmatrix}$$
 
 It's basically a PCA but without mean shifting.But SVD works better in SA because it is able to detect and extract small signals from noisy data. Noisy data here means words that are not significant for prediction.
 
+In this context, it is known as latent semantic analysis (LSA).
+
 ```{r}
 # we transpose id because we want docunent as 
-Xmat <- as.matrix(Xdf)
+Xmat <- t(as.matrix(Xdf))
 dim(Xmat)
 
+# calculate the sparsity of the matrix
+sprintf("Matrix sparsity = %.2f%%", 100*(1- sum(Xmat > 0) / length(Xmat)))
+
 # call svd on this matrix
-Xmat.svd <- svd(Xmat, nu=30, LINPACK=T)
+Xmat.svd <- svd(Xmat, LINPACK=T)
 save(Xmat.svd, file=paste(this.dir, "Xmat.svd", ".RData", sep=""))
 #load(paste(this.dir, 'Xmat.svd', '.RData', sep=''))
 
-dim(Xmat.svd$u)
-length(Xmat.svd$d)
-dim(Xmat.svd$v)
+sprintf("U matrix dimension is: %dx%d", dim(Xmat.svd$u)[1], dim(Xmat.svd$u)[2])
+sprintf("d (sigma) matrix is : %d ", length(Xmat.svd$d))
+sprintf("V matrix dimension is: %dx%d", dim(Xmat.svd$v)[1], dim(Xmat.svd$v)[2])
 ```
 
-U matrix dimension is : 5x5
-d (sigma) matrix is   : 5x5
-V (sigma) matrix is   : x5
 
-The diagonal vector d generated is ordered by importance of each dimension.
-Let's graph a cumulative variance 
+The diagonal vector `d` generated is ordered by importance of each dimension.
+Let's graph a cumulative variance:  
 
 ```{r}
-#Xmat.svd$d
 s <- sum(Xmat.svd$d)
 d <- data.frame(var = cumsum(Xmat.svd$d^2/sum(Xmat.svd$d^2)))
-ggplot(d, aes(x=1:nrow(d), y=var)) + geom_line() #+ scale_x_log10()
+ggplot(d, aes(x=1:nrow(d), y=var)) + geom_line() +
+      xlab("number of eigenvectors") +
+      ylab("Cumulative variance") + scale_x_log10()
 ```
 
-### Design decision
-We have to decide how many dimensions to keep. Looking at the graph we can keep 10 dimensions which represent almost 99% of the features.
+> Design decision
+>
+>We have to decide how many dimensions to keep. Looking at the graph we can keep 10 dimensions which represent almost 99% of the features.
 This is curious and a puzzling choice to make. But let's aim for fast processing and later on see if adding more dimensions improves our prediction.
 
+In order to rotate into our new space of reduced dimensions we have to limit the number of eigenvectors in `U` then transpose it an multiply it by the original X :
+
+$$ \hat{X} = U^{T}\cdot X $$
+
 ```{r}
-#round(Xmat.svd$u %*% diag(Xmat.svd$d) %*% t(Xmat.svd$v))
+truncate <- 100
+Xmat_h <- t(Xmat.svd$u[,1:truncate]) %*% Xmat
+```
 
-pc.use <- 20
-recon <- round(Xmat.svd$u[,1:pc.use] %*% diag(Xmat.svd$d[1:pc.use]) %*% t(Xmat.svd$v[,1:pc.use]))
+Transform it back to a dataframe and bring back the truth y
 
+```{r}
+X_h <- data.frame(y=Y , t(Xmat_h))
 ```
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-If we consider only negative and positive features as predictors let's see how it looks
+If we consider the first 2 dimensions as predictors let's see how it looks
 
 ```{r}
-words  %>%
-    ggplot(aes(positive, negative, color=factor(y))) + 
+X_h  %>%
+    ggplot(aes(X2, X1, color=factor(y))) + 
     geom_jitter() # + scale_x_log10() + scale_y_log10()
 ```
+
+
 
 
 
@@ -447,10 +440,10 @@ use these data frames to do the rest of the analyses in the problem set.
 ```{r}
 
 set.seed(123)
-# sample from 1 to the length of words
-test_sample <- sample(1:nrow(words), nrow(words)/5) 
-test <- words[test_sample,]
-train <- words[-test_sample,]
+# sample from 1 to the length of X_h
+test_sample <- sample(1:nrow(X_h), nrow(X_h)/5) 
+test <- X_h[test_sample,]
+train <- X_h[-test_sample,]
 # just checking the dimensions
 nrow(train) / nrow(test)
 ```
@@ -546,7 +539,7 @@ benchmark <- bind_rows(benchmark,
                                      accu = svm.accuracy ))
 ```
 
-## Logistic regression
+### Logistic regression
 
 ```{r}
 
@@ -574,7 +567,7 @@ lda.model <- lda(y ~ ., train)
  
 plda = predict(lda.model, newdata = test, type="response")
 
-## compute lr confusion matrix assuming a cutoff at 0.5
+## compute lda confusion matrix
 lda.tab <- table(test$y, plda$class)
  
 lda.accuracy <- confusionMatrix(lda.tab , positive="1")$overall[[1]];lda.accuracy
@@ -586,26 +579,16 @@ benchmark <- bind_rows(benchmark,
 ```
 
 
-Checking RoC curve
-
-
-```{r}
-
-roc_ <- roc(test$y, glm.pred)
-plot(roc_)
-```
-
-Cross-Validation of Logistic Regression
+### Cross-Validation of Logistic Regression
 
 ```{r}
 
-
-# define training control
+#define training control
 train_control <- trainControl(method="cv", number=10)
-words <- mutate(words, y = factor(y))
+X_h <- mutate(X_h, y = factor(y))
 # train the model
 model <- train(y ~ .,
-             data = words,
+             data = X_h,
              method = "glm",
              trControl = train_control,
              tuneLength = 1, # How fine a mesh to go on grid
@@ -615,64 +598,8 @@ model <- train(y ~ .,
 print(model)
 ```
 
-# Dimension reduction using PCA
 
-Let's try to extract the Principal Components that maximize variance
-
-```{r, cache=TRUE}
-X <- mat_train[,-1]
-pc <- prcomp(X, center = FALSE, scale = FALSE)
-```
-
-And explore the variance of PCs:
-We can see there that the first 6 PCs have more than {90\%} of the variance of the data.
-
-```{r}
-plot(pc$sdev^2/sum(pc$sdev^2))
-summary(pc)$importance[,1:6]
-```
-
-By eliminating the neutral class we can visually see some demarcation of negative class.
-Because we are using unigrams, negations such as in "Not good", will be considered positive so the majority of  positive words will contribure to negative.
-That's why we see the positive is overlapping negatives in the graph below:
-
-```{r}
-pcadf <- data.frame(PC1 = pc$x[,1], 
-                    PC2 = pc$x[,2],
-                    class=factor(mat_train[,1])) 
-
-pcadf %>%  ggplot(aes(PC1, PC2, fill=class))+
-           geom_point(cex=2, pch=21)
-```
-
-Use that data to do logistic regression
-
-
-```{r}
-k <- 10
-
-train.pca <- data.frame(y=mat_train[,1], (X %*% pc$rotation[,1:k]))
-test.pca  <- data.frame(y=mat_test[,1], (mat_test[,-1] %*% pc$rotation[,1:k]))
-
-pc.fit <- glm(y ~ ., data=train.pca, family="binomial")
-
-# predict on all data
-
-test.pca.pred <- predict(pc.fit, newdata=test.pca) > 0
-
-## compute confusion matrix 
-table(test$y, test.pca.pred) 
-
-## compute accuracy
-pca.accuracy <- accuracy(test$y, test.pca.pred);pca.accuracy
-
-benchmark <- bind_rows(benchmark,
-                          data_frame(method="PCA with GLM",  
-                                     accu = pca.accuracy ))
-```
-
-
-## Randon Forest 
+### Randon Forest 
 
 The `randomForest` prediction function works similarly to decision trees
 
@@ -700,14 +627,13 @@ benchmark <- bind_rows(benchmark,
 
  
 ```{r}
-rf.fit$importance
-rf.pred <- predict(rf.fit, test)
+rf.fit$importance[1:5,]
 ```
 
 
 ## Conclusion
 
-In this study we used a supervised machine learning approach and tried several classification models. From the table below, the algorithmic approach using randomForest gives the best accuracy. we are 25% better than flipping a coin with only a classified bag of words.
+In this section we used a supervised machine learning approach and tried several classification models. From the table below, the algorithmic approach using randomForest gives the best accuracy. we are 25% better than flipping a coin with only a classified bag of words.
 
 
 ```{r}
@@ -716,9 +642,242 @@ benchmark %>% kable
 ```
 
 
+# Sentiment lexicons using Natural Language Processing
+
+## Feature Extraction and Classification
+
+
+The first step is to extract 2 types of phrases :
+- Verbal phrases  that may imply opinions. Example : "I didn't like the design"
+- Noun phrases that may describe the product. Example : The design was not good""
+
+In our work, we use the OpenNLP chunker. This chunker will split a given text into a sequence of semantically correlated phrases but does not specify their internal structure, nor their role in the main sentence.
+
+openNLP `Maxent_Chunk_Annotator` requires a pre-made models. These are conveniently available to R by installing the respective `openNLPmodels.language` package from the repository at http://datacube.wu.ac.at
+
+To install english language model (a heavy download 74MB) :
+`install.packages("openNLPmodels.en", repos = "http://datacube.wu.ac.at")`
+
+
+```{r}
+library(NLP) 
+library(openNLP)
+library(openNLPmodels.en)
+```
+
+In the following, we'll experiment with a 1-star rated wireless charger from Amazon. And to evaluate this chuncker we selected a text with a lot of grammer and orthograph mistakes:
+
+Fix punctuation issues in this example "best.I" using `gsub` from the `stringr` package.
+
+```{r}
+txt <- c("I would rather not have to worry about overheating and potential battery damage than to continue using it.")
+
+
+txt <- gsub( "([\\.\\,\\!\\?])([^ ]+)", "\\1 \\2", txt)
+s <- as.String(txt)
 
 
 
+```
+
+## Sentence chunking and Part-of-Speech tagging
+
+The part-of-speech tags meaning is found in the [Penn Treebank Project](https://www.ling.upenn.edu/courses/Fall_2003/ling001/penn_treebank_pos.html)
+
+The chunk tags contain the name of the chunk type, for example I-NP for noun phrase words and I-VP for verb phrase words. Most chunk types have two types of chunk tags, B-CHUNK for the first word of the chunk and I-CHUNK for each other word in the chunk
+
+```{r}
+## Chunking needs word token annotations with POS tags.
+sent_token_annotator <- Maxent_Sent_Token_Annotator()
+word_token_annotator <- Maxent_Word_Token_Annotator()
+pos_tag_annotator <- Maxent_POS_Tag_Annotator()
+a3 <- annotate(s,
+               list(sent_token_annotator,
+                    word_token_annotator,
+                    pos_tag_annotator))
+
+chunks <- annotate(s, Maxent_Chunk_Annotator(), a3)
+
+```
 
 
+Transform it to  [word, pos-tag, chunk-tag] dataframe :
+
+```{r}
+words <- subset(chunks, type == "word")
+
+chk_df <- as.data.frame(words) %>% 
+  mutate(word = s[words],
+         pos_tag = sapply(features, '[[', "POS"),
+         chk_tag = sapply(features, '[[', "chunk_tag")
+         ) %>% 
+  dplyr::select (word,pos_tag, chk_tag)
+
+## preview
+chk_df %>% head(10) %>% kable
+```
+
+The first column contains the current word.
+
+The second its part-of-speech tag
+
+The third its chunk tag.
+
+### Feature identification
+
+Now we want to identify features. For the purpose of this work we won't go for a full analysis using penn tree. Rather we'll simply identify the following words indise a verbal phrase:
+
+- [VB] : verb w/ positive/negative sentiment : like, hate , etc
+- [JJ] : adjective w/ positive/negative sentiment : bad, junk
+- [RB] : adverb polarity inverter such as : n't, or incr/decrementers such as : too, very, more etc.
+
+First, let's use tidytext sentiments to construct such mapping table
+
+```{r}
+#s_levels <- c("negative", "positive")
+
+dict <- sentiments %>% 
+        filter(lexicon == "AFINN")  %>%
+        dplyr::select(word,score)
+
+## inverters
+inv_  <- c("never", "no", "nothing", "nowhere", "noone", "none", "not", "n't")
+inv_ <- data.frame(word = as.character(inv_), score = rep(-1, length(inv_)), stringsAsFactors = F)
+
+## incrementer/decrementers
+inc_ <- c("too", "very", "extremly", "badly", "poorly" )
+inc_ <-  data.frame(word = as.character(inc_), score = c(2,2,3,.5,.4), stringsAsFactors = F)
+
+dico <- rbind(inv_,inc_ , dict)
+
+## let's apply the scores
+chk_df <- chk_df %>% left_join(dico, by="word" )
+VPs <- chk_df %>% filter(chk_tag %in% c("B-NP", "I-NP", "O")) %>% 
+      mutate(pos_tag = substring(pos_tag,1,2),
+             chk_tag = substring(chk_tag,1,1))
+VPs$score[is.na(VPs$score)] <- 0
+
+```
+
+## Scoring algorithm
+
+Now comes the scoring algorithm part. The idea is to find a VB or JJ and look for a surrounding RB multiplier:
+
+For example : n't like : will compute 2 x -1
+
+```{r}
+## chunks array of score
+chunk_scores <- c()
+
+## initialize the chunk scope variables
+chunk_scope <- FALSE
+chunk_score <- 1
+chunk_mltpl <- 1
+
+
+## start the ball rolling
+for (i in 1:nrow(VPs)) {
+  r <- VPs[i,]
+  print(r$pos_tag)
+  
+  if (!chunk_scope) {
+     # continue looking for a B-VP
+     if (r$chk_tag != "B") next 
+     chunk_scope <- T
+  } else if (r$chk_tag == "B" | r$chk_tag == "O") {
+    chunk_scores <- c(chunk_scores, chunk_score*chunk_mltpl)
+    chunk_scope <- FALSE
+    chunk_score <- 1
+    chunk_mltpl <- 1
+  }
+  # we are inside a chunk scope, analyze until we find a B-VP or O
+  if (r$pos_tag == "NN") {
+           chunk_score <- chunk_score + r$score
+  } else if (r$pos_tag == "JJ" & r$score != 0) {
+           chunk_mltpl <- chunk_mltpl * r$score
+  } 
+}
+
+## our final score is
+sum(chunk_scores)
+```
+
+Now we need to wrap all above into a function 
+
+```{r}
+
+estimate_sentiment = function(x) {
+      x <- as.String(x)
+      a3 <- annotate(x,
+                     list(sent_token_annotator,
+                          word_token_annotator,
+                          pos_tag_annotator))
+      
+      chunks <- annotate(x, Maxent_Chunk_Annotator(), a3)
+      ## Transform it  a word, pos-tag, chunk-tag dataframe
+      words <- subset(chunks, type == "word")
+      chk_df<-as.data.frame(words) %>% 
+        			mutate(	  word = x[words],
+               			pos_tag = sapply(features, '[[', "POS"),
+               			chk_tag = sapply(features, '[[', "chunk_tag")
+               	) %>% 
+      			dplyr::select (word,pos_tag, chk_tag)
+      ## let's apply the scores
+      chk_df <- chk_df %>% left_join(dico, by="word" )
+      VPs <- chk_df %>% filter(chk_tag %in% c("B-VP", "I-VP", "O")) %>% 
+            mutate(pos_tag = substring(pos_tag,1,2),
+                   chk_tag = substring(chk_tag,1,1))
+      VPs$score[is.na(VPs$score)] <- 0
+      print (VPs)
+      
+      ## chunks array of score
+      pos.count <- 0
+      neg.count <- 0
+      
+      ## initialize the chunk scope variables
+      chunk_scope <- FALSE
+      chunk_score <- 1
+      chunk_mltpl <- 1
+      
+      ## start the ball rolling
+      for (i in 1:nrow(VPs)) {
+        r <- VPs[i,]
+        if (!chunk_scope) {
+           # continue looking for a B-VP
+           if (r$chk_tag != "B") next 
+           chunk_scope <- T
+        } else if (r$chk_tag == "B" | r$chk_tag == "O") {
+          this.score  <- chunk_score*chunk_mltpl
+          pos.count <- pos.count + (this.score >= 0)
+          neg.count <- pos.count + (this.score <  0)
+          print (this.score)
+          chunk_scope <- FALSE
+          chunk_score <- 1
+          chunk_mltpl <- 1
+        }
+        # we are inside a chunk scope, analyze until we find a B-VP or O
+        if (r$pos_tag == "VB") {
+                 chunk_score <- chunk_score + r$score
+        } else if (r$pos_tag == "RB" & r$score != 0) {
+                 chunk_mltpl <- chunk_mltpl * r$score
+        } 
+      }
+      
+      ## our final score is
+      (neg.count - pos.count) /(neg.count + pos.count + 1)
+}
+
+```
+
+Apply it to a number of review texts .
+
+```{r}
+#Section To be completed
+
+# xtract <- df %>% sample_n(20)
+# y_hat <- apply(xtract, 1, function(z) estimate_sentiment(z))
+# table(xtract$rating,  (y_hat > 0) + 0)
+# accuracy(xtract$rating,  (y_hat > 0.5) + 0)
+
+```
 
