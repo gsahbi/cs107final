@@ -16,10 +16,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Motivation :
 Sentiment Analysis, is receiving a big attention these days, because of its huge specrum of applications ranging from product review analysis, compain feedback, competition benchmarking, customer profiles, political trends, etc...
 
-There is a huge flow of information coming from the internet and social networks. Online discussions are only relevant to people for a couple of days. Nobody actulaly goes in past tweets for more than a week, for instance. This entire humanity archive of discussion could help in many applications if we train machines to understand the sentiment of people towards a specific theme at a specific time. 
+There is a huge flow of information going through the internet and social networks. Online discussions are only relevant to people for a couple of days. Nobody actually goes in past to tweets that are older than maybe a week, for instance. This entire humanity archive of discussion could help in many applications if we train machines to understand the sentiment of people towards a specific theme at a specific time. 
 
 ## Background
-“Sentiment analysis is the computational study of people's opinions, sentiments, emotions, and attitudes.” [Excerpt From: Bing Liu. Sentiment Analysis: Mining Opinions, Sentiments, and Emotions.] 
+“Sentiment analysis is the computational study of people's opinions, sentiments, emotions, and attitudes.” [Excerpt From: Bing Liu. Sentiment Analysis: Mining Opinions, Sentiments, and Emotions.]. This book is an excellent survey of NLP and SA research.
 
 Given the large amount of data available on the Web, it is now possible to investigate high-level Information Retrieval tasks like user's intentions and feelings about facts or objects discussed. [Pang, B., Lee, L., 2008. Opinion mining and sentiment analysis. Foundations and Trends in Information Retrieval] 
 
@@ -30,8 +30,9 @@ There are several things to take into consideration when approaching a Sentiment
 
 - Sentiment lexicons using Natural Language Processing (NLP) techniques. A Sentiment lexicon is a list of words that are associated to polarity values (positive or negative). NLP techniques offer a deep level of analysis since they take into account the context words in the sentence. 
 
-
 - Machine Learning classification algorithms. Because sentiment classification is a text classification problem, any existing supervised learning method can be directly applied [Bing Liu]. For example,  naïve Bayes classification , logistic regression, support vector machines (SVM), etc..
+
+In this work we'll work on ML classification and then try to get into the NLP and experience some of the basic techniques used.
 
 
 ```{r message=FALSE,echo=FALSE}
@@ -60,16 +61,15 @@ sapply(libs, require, character.only=TRUE)
 
 ### Load data
 
-In this work we'll use a dataset that we obtained thankfully from Julian McAuley, at University of San Diego  here http://jmcauley.ucsd.edu/data/amazon/
+In this work we'll use a dataset that we obtained thankfully from Julian McAuley, at the University of San Diego (here)[http://jmcauley.ucsd.edu/data/amazon/] 
 
-We'll use their SIGIR and KDD papers (listed on the above page) as a baseline for our accuracy benchmarking.
+We'll be also inspired by their SIGIR and KDD papers (listed on the above page) as a baseline for our accuracy benchmarking.
 
 This dataset contains product reviews and metadata from Amazon, including 142.8 million reviews spanning May 1996 - July 2014. 
-We'll be using electronics reviews for this work.
+We have decided to use electronics reviews for this work. Because electronics are not perfect so create a lot of contrasted opinions.
  
 
 ```{r }
-
 # TODO: Set working directory to where this script is (avoid hardcoded paths)
 this.dir <- "/Users/sahbi/HES/CS107/final project/cs107final/"
 setwd(this.dir)
@@ -234,6 +234,38 @@ gc()
 
 One of the simpler things to do with text is to treat each text as a "bag of words". We have used the `tm` package in order to construct a Term Document Matrix but the computer couldn't handle such  huge dimensions. So let's go with `tidytext`
 
+Let's discover the top words for both positive and negative ratings. We use the `wordcloud` package to have a nice display. 
+
+
+```{r warning=FALSE}
+
+emo_pos <- df %>% filter(rating == 1)  %>%
+            unnest_tokens(word, reviewText)  %>%
+            filter(!word %in% stop_words$word) %>%
+            filter(nchar(word) > 2) %>%
+            count(word) 
+
+emo_neg <- df %>% filter(rating == 0)  %>%
+            unnest_tokens(word, reviewText)  %>%
+            filter(!word %in% stop_words$word) %>%
+            filter(nchar(word) > 2) %>%
+            count(word) 
+
+layout(matrix(c(1:4), nrow=2, ncol = 2), heights=c(1, 4))
+par(mar=rep(0, 4))
+plot.new()
+text(x=0.5, y=0.5, "Positive ratings", cex=2)
+
+wordcloud(words = emo_pos$word, freq = emo_pos$n, scale=c(5,0.5), max.words=100, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
+
+plot.new()
+text(x=0.5, y=0.5, "Negative ratings", cex=2)
+
+wordcloud(words = emo_neg$word, freq = emo_neg$n, scale=c(5,0.5), max.words=100, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
+
+```
+
+
 
 ### Text tidiying
 
@@ -270,11 +302,42 @@ Xdf <- df %>%
     count(word, id) %>%
     spread(word, n, fill = 0) %>%
     dplyr::select(-id)
-
-# we transpose id because we want docunent as 
-Xmat <- as.matrix(Xdf)
-dim(Xmat)
 ```
+
+### TF-IDF
+
+Term Frequency - Inverse Document Frequency is term count within a document weighted against the term's ubiquity within the corpus. This weight is based on the principle that terms occurring in almost every document are therefore less specific to an individual document and should be scaled down. 
+So a tf-idf value represents the term's relative importance within a document.
+
+Compute tf-idf, inverse document frequency, and relative term frequency on document-feature matrices
+
+$$tf(t,d) = \frac{f_{d}(t)}{\underset{w \in d}{max}}$$
+$$idf(t,D) = log \left (\frac{|D|}{|d \in D : t \in d|}  \right )$$
+$$tfidf(t,d,D) = tf(t,d)\cdot idf(t,D)$$
+$$f_d(t) := freqency\ of\ term\ t\ in\ document\ d$$
+$$D : corpus\ of\ documents$$
+$$|D| : number\ of\ documents\ where\ the term\ t\appears $$
+$$|d \in D : t \in d|\ :\ number\ of\ documents\ where\ the\ term\ t\ appears $$
+
+```{r}
+
+
+## tfidf function implementaion
+## the normalize will divide x by the text total freq.
+tfidf <- function(x, normalize=TRUE){
+
+  if(normalize) x <- x/rowSums(x)
+  
+  tf <- t(x)
+  idf <- log(nrow(x)) - log(colSums(x>0) + 1)
+  t( tf*idf )
+}
+
+Xdf <- tfidf(Xdf) 
+
+```
+
+
 
 ### Reduce dimensionality (Single Vector Decomposition)
 
@@ -282,14 +345,22 @@ Suppose we have m words (features) and n documents
 Single vector decomposition (SVD) of an m*n real or complex matrix X is a factorization of the form :
 
 
-$$\mathbf{ X = U \Sigma V^{T} }$$
-$$ U\ is\ m x r\ matrix,\ columns\ of\ U\ contain\ the\ Eigenvectors\ of\ X \cdot X^{T} $$
-$$ V\ is\ an\ r x n,\ columns\ of\ V\ contain\ the\ Eigenvectors\ of\ X^{T} \cdot X $$
-$$ \Sigma\ is\ a\ diagonal\ r x r\ matrix.\ diagonal\ values\ are\ eigenvalues\ of\ X \cdot X^{T}$$
+$\mathbf{ X = U \Sigma V^{T} }$
+$ U\ is\ m x r\ matrix,\ columns\ of\ U\ contain\ the\ Eigenvectors\ of\ X \cdot X^{T} $
+$ V\ is\ an\ r x n,\ columns\ of\ V\ contain\ the\ Eigenvectors\ of\ X^{T} \cdot X $
+$ \Sigma\ is\ a\ diagonal\ r x r\ matrix.\ diagonal\ values\ are\ eigenvalues\ of\ X \cdot X^{T}$
 
-It's basically a PCA but without mean shifting.
+$$\begin{bmatrix} x_{1,1} & x_{1,2}  & \cdots & x_{1,n} \\ x_{2,1}& \ddots & & \vdots \\ \vdots &  & \ddots & \vdots \\ 
+ x_{m,1}& \cdots &  \cdots & x_{m,n} \\ \end{bmatrix}= \begin{bmatrix} u_{1,1} & u_{1,2}  & \cdots & u_{1,r} \\ u_{2,1}& \ddots & & \vdots \\ \vdots &  & \ddots & \vdots \\u_{m,1}& \cdots &  \cdots & u_{m,r} \\\end{bmatrix} \cdot diag \begin{bmatrix}d_{1}\\\vdots \\  \vdots  \\  d_{r} \\ \end{bmatrix}\cdot \begin{bmatrix} v_{1,1} & v_{1,2}  & \cdots & v_{1,n} \\ v_{2,1}& \ddots & & \vdots \\ \vdots &  & \ddots & \vdots \\ v_{r,1}& \cdots &  \cdots & v_{r,n} \\ \end{bmatrix}$$
+
+It's basically a PCA but without mean shifting.But SVD works better in SA because it is able to detect and extract small signals from noisy data. Noisy data here means words that are not significant for prediction.
 
 ```{r}
+# we transpose id because we want docunent as 
+Xmat <- as.matrix(Xdf)
+dim(Xmat)
+
+# call svd on this matrix
 Xmat.svd <- svd(Xmat, nu=30, LINPACK=T)
 save(Xmat.svd, file=paste(this.dir, "Xmat.svd", ".RData", sep=""))
 #load(paste(this.dir, 'Xmat.svd', '.RData', sep=''))
@@ -314,9 +385,8 @@ ggplot(d, aes(x=1:nrow(d), y=var)) + geom_line() #+ scale_x_log10()
 ```
 
 ### Design decision
-We have to decide how many dimensions to keep. Looking at the graph we can keep 10 dimensions which represent almost 99%.
-This is curious and a puzzling choice to make. But let's aim for fast processing.
-Let's visualize thigs
+We have to decide how many dimensions to keep. Looking at the graph we can keep 10 dimensions which represent almost 99% of the features.
+This is curious and a puzzling choice to make. But let's aim for fast processing and later on see if adding more dimensions improves our prediction.
 
 ```{r}
 #round(Xmat.svd$u %*% diag(Xmat.svd$d) %*% t(Xmat.svd$v))
@@ -350,36 +420,6 @@ recon <- round(Xmat.svd$u[,1:pc.use] %*% diag(Xmat.svd$d[1:pc.use]) %*% t(Xmat.s
 
 
 
-### TF-IDF
-
-Term Frequency - Inverse Document Frequency is term count within a document weighted against the term's ubiquity within the corpus. This weight is based on the principle that terms occurring in almost every document are therefore less specific to an individual document and should be scaled down. 
-So a tf-idf value represents the term's relative importance within a document.
-
-Compute tf-idf, inverse document frequency, and relative term frequency on document-feature matrices
-
-$$tf(t,d) = \frac{f_{d}(t)}{\underset{w \in d}{max}}$$
-$$idf(t,D) = log \left (\frac{|D|}{|d \in D : t \in d|}  \right )$$
-$$tfidf(t,d,D) = tf(t,d)\cdot idf(t,D)$$
-$$f_d(t) := freqency\ of\ term\ t\ in\ document\ d$$
-$$D : corpus\ of\ documents$$
-$$|D| : number\ of\ documents\ where\ the term\ t\appears $$
-$$|d \in D : t \in d|\ :\ number\ of\ documents\ where\ the\ term\ t\ appears $$
-
-```{r}
-d <- words %>% dplyr::select(-y)
-tf <- d
-idf <- nrow(d)/colSums(d)
-tfidf <- d
-
-for(word in names(idf)){
-  tfidf[,word] <- tf[,word] * idf[word]
-}
-
-tfidf <- tfidf %>% mutate(y=words$y) 
-nc <- ncol(tfidf)
-
-words <- tfidf[, c(nc, 1:(nc-1))]
-```
 
 
 If we consider only negative and positive features as predictors let's see how it looks
@@ -390,36 +430,7 @@ words  %>%
     geom_jitter() # + scale_x_log10() + scale_y_log10()
 ```
 
-Discover the top words for both positive and negative ratings. We use the `wordcloud` package to have a nice display. 
 
-
-```{r warning=FALSE}
-
-emo_pos <- df %>% filter(rating == 1)  %>%
-            unnest_tokens(word, reviewText)  %>%
-            filter(!word %in% stop_words$word) %>%
-            filter(nchar(word) > 2) %>%
-            count(word) 
-
-emo_neg <- df %>% filter(rating == 0)  %>%
-            unnest_tokens(word, reviewText)  %>%
-            filter(!word %in% stop_words$word) %>%
-            filter(nchar(word) > 2) %>%
-            count(word) 
-
-layout(matrix(c(1:4), nrow=2, ncol = 2), heights=c(1, 4))
-par(mar=rep(0, 4))
-plot.new()
-text(x=0.5, y=0.5, "Positive words", cex=2)
-
-wordcloud(words = emo_pos$word, freq = emo_pos$n, scale=c(5,0.5), max.words=100, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
-
-plot.new()
-text(x=0.5, y=0.5, "Negative words", cex=2)
-
-wordcloud(words = emo_neg$word, freq = emo_neg$n, scale=c(5,0.5), max.words=100, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
-
-```
 
 
 ## Supervised training
