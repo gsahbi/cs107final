@@ -2,96 +2,113 @@
 title: 'CS107 Final Froject : Sentiment Analysis of Product Reviews'
 author: "Sahbi Ben Gdaiem, Mohammed Hadj-Ali"
 date: "April 27, 2016"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    number_sections: true
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Introduction
+# Introduction
+## Motivation :
+Sentiment Analysis, is receiving a big attention these days, because of its huge specrum of applications ranging from product review analysis, compain feedback, competition benchmarking, customer profiles, political trends, etc...
 
-TODO : introduce the subject, motivation, approach etc..
+There is a huge flow of information coming from the internet and social networks. Online discussions are only relevant to people for a couple of days. Nobody actulaly goes in past tweets for more than a week, for instance. This entire humanity archive of discussion could help in many applications if we train machines to understand the sentiment of people towards a specific theme at a specific time. 
 
-## Sentiment Analyis
+## Background
+“Sentiment analysis is the computational study of people's opinions, sentiments, emotions, and attitudes.” [Excerpt From: Bing Liu. Sentiment Analysis: Mining Opinions, Sentiments, and Emotions.] 
 
-TODO : some theory 
+Given the large amount of data available on the Web, it is now possible to investigate high-level Information Retrieval tasks like user's intentions and feelings about facts or objects discussed. [Pang, B., Lee, L., 2008. Opinion mining and sentiment analysis. Foundations and Trends in Information Retrieval] 
+
+# Sentiment Analyis
+
+## Challenge :
+There are several things to take into consideration when approaching a Sentiment Analysis task. In general, there are two main approaches: 
+
+- Sentiment lexicons using Natural Language Processing (NLP) techniques. A Sentiment lexicon is a list of words that are associated to polarity values (positive or negative). NLP techniques offer a deep level of analysis since they take into account the context words in the sentence. 
+
+
+- Machine Learning classification algorithms. Because sentiment classification is a text classification problem, any existing supervised learning method can be directly applied [Bing Liu]. For example,  naïve Bayes classification , logistic regression, support vector machines (SVM), etc..
 
 
 ```{r message=FALSE,echo=FALSE}
-# Load the packages required
-library("jsonlite")    ##  loading JSON data input 
-library("stringr")     ##  gsub
-library("knitr")       ##  kable
-library("ggplot2")     ##  for plots
-library("dplyr")       ##  for dataframe wrangling
-library("randomForest") #  for randomForest classification
-library("caret")       ##
-library("e1071")       ##  for naive bayes and SVM 
-library("MASS")        ##   
-library("wordcloud")   ##  word cloud
-library("tidyr")       ##  
-library("tidytext")    ##  tokenizer and sentiment dataset
-library("pROC")        ##  for RoC
+# Specify and load required R packages. 
+libs = c(
+  "jsonlite",    ##  loading JSON data input 
+  "tm",          ##  essential, feature extraction and fitting
+  "stringr",     ##  gsub
+  "knitr",       ##  kable
+  "ggplot2",     ##  for plots
+  "dplyr",       ##  for dataframe wrangling
+  "randomForest", #  for randomForest classification
+  "caret",       ##
+  "e1071",       ##  for naive bayes and SVM 
+  "MASS",        ##   
+  "wordcloud",   ##  word cloud
+  "tidyr",       ##  
+  "tidytext",    ##  tokenizer and sentiment dataset
+  "pROC"         ##  for RoC
+)
+
+sapply(libs, require, character.only=TRUE)
 ```
 
 ## Data Wrangling and Preparation
 
 ### Load data
 
-```{r cache=TRUE}
+In this work we'll use a dataset that we obtained thankfully from Julian McAuley, at University of San Diego  here http://jmcauley.ucsd.edu/data/amazon/
+
+We'll use their SIGIR and KDD papers (listed on the above page) as a baseline for our accuracy benchmarking.
+
+This dataset contains product reviews and metadata from Amazon, including 142.8 million reviews spanning May 1996 - July 2014. 
+We'll be using electronics reviews for this work.
+ 
+
+```{r }
 
 # TODO: Set working directory to where this script is (avoid hardcoded paths)
 this.dir <- "/Users/sahbi/HES/CS107/final project/cs107final/"
 setwd(this.dir)
 
 #json_file <- "data/reviews_electronics_extract.json"
-json_file <- "data/reviews_elect_100K.json.gz"
+json_file <- "data/reviews_electronics_extract.json.gz"
 ```
-
 
 The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the approriate way of to load the data into a data frame.
 
-```{r}
+```{r cache=TRUE}
 dat <- stream_in(gzfile(json_file), verbose = FALSE)
+
+dat <- dat %>% head(100)    ## comment after testing
 
 #Preview the result.
 glimpse(dat)
 ```
 
-### Data wrangling
-
-Prepare the text for processing, convert it to lower case, and keep only relevant columns.
-We then garbage collect the old df
-
-```{r}
-
-df <- dat %>% mutate(reviewText = tolower(summary)) %>% 
-              dplyr::select(reviewText, overall)
-
-```
-
-The `unnest_tokens` function does not remove punctuation in this example "best.I" 
-so I'll remove them manually using `gsub` from the `stringr` package.
-
-```{r}
-df$reviewText = gsub( "([[:punct:]])([^ ]+)", "\\1 \\2", df$reviewText)
-df %>% head(10) %>% kable
-```
-
 
 ## Exploratory Data Analysis
+### Basic numbers
+Let's explore some facts about our data.
 
+Checking how many users are there. Almost we have 46K users for 50K reviews. So each user has done 1 unique review per product.
 
 ```{r}
-
-## checking how many users are there 
 n_distinct(dat$reviewerID)
+```
 
-## checking how many products are there
+Checking how many products are there using the distinct ASIN (Amazon Standard Identification Number) amazon's unique product idenntifier. 
+
+```{r}
 n_distinct(dat$asin)
+```
 
-## looking for the number of ratings per product
+Let's look at at the the number of ratings per product. It's quite skewed with some extreme best sellers (a headphone from Koss) having 3000 reviews. 
+
+```{r}
 dat %>% group_by(asin) %>%
         summarize(n_ratings = n() ) %>% 
         ggplot(aes(n_ratings)) + 
@@ -100,9 +117,40 @@ dat %>% group_by(asin) %>%
         labs(title="Histogram for Ratings per Product") +
         labs(x="Number of Ratings", y="Count") 
 
-## Let's see the distribution of ratings 
+# best seller
+dat %>% group_by(asin) %>% 
+        summarize(n_ratings = n() ) %>% arrange(desc(n_ratings)) %>% head(1) %>% .$asin
+```
 
-dat %>%  ggplot(aes(overall)) + 
+### Simplification of data
+
+Prepare the text for processing, convert it to lower case, and keep only relevant columns.
+We then garbage collect the old `dat`
+
+```{r}
+df <- dat %>% mutate(reviewText = reviewText) %>% 
+              dplyr::select(reviewText, overall)
+# rm(dat)  ## TODO : uncomment for production version
+gc()
+```
+
+
+### Rating system in Amazon
+
+The rating system used in Amazon is as follows : 
+
+* emotional positive (5 stars)
+* rational positive  (4 stars)
+* neutral            (3 stars)
+* rational negative  (2 stars)
+* emotional negative (1 star )
+
+**The user's star rating of his own review description as a subjective human interpretation of opinion. So, we consider that as the ground truth.** 
+
+Let's see the distribution of these ratings in our case
+
+```{r}
+df %>%  ggplot(aes(overall)) + 
 geom_histogram(binwidth=1,
                col="red", 
                fill="green",
@@ -111,19 +159,15 @@ geom_histogram(binwidth=1,
                 labs(x="Rating Stars", y="number of reviews") 
 
 mean(dat$overall)
-# the data is very skewed towards positive feedback. Which is an indication that Amazon is not selling junk at least but it's not going to help in our prediction.
 ```
 
-## Design Decisions
+> The ratings are very skewed towards positive feedback. Which is an indication that Amazon is not selling junk at least but it's not going to help in our modeling. We have to have equal likelihood of each class of the ratings. 
 
-The rating system used in Amazon is as follows : 
+> In the next sections we'll solve this.
 
-* emotional positive (+2 or 5 stars)
-* rational positive (+1 or 4 stars)
-* neutral (0 or 3 stars)
-* rational negative (−1 or 2 stars)
-* emotional negative (−2 or 1 star)
+## Design decisions on reviews
 
+In this work we will have a binary classification. Either Positive or Negative.
 We objectively chose to demarcate each rating at the 2.x level divide, such that star ratings above this level would be marked as “1” and star ratings below this level would be marked as “0” 
 
 We will collapse the 3, 4 and 5 stars ratings into “1” value, and the 1 and 2 stars ratings into Negative “0”
@@ -143,7 +187,6 @@ df <- df %>%
       mutate(id = row_number())
 ```
 
-
 Let's check again the distribution of opinions
 
 ```{r}
@@ -154,7 +197,6 @@ df %>%  ggplot(aes(rating)) +
                alpha = .2) + 
 labs(title="Histogram for Ratings per Product") +
 labs(x="Rating Stars", y="number of reviews") 
-
 ```
 
 Even after this mapping the class proportions need to be corrected manually.
@@ -186,53 +228,142 @@ rm(df3, dat, positive_ids, remove_ids)
 gc()
 ```
 
+## Machine Learning 
 
-## Feature Extraction and Classification (Bag of Words)
+### Bag of Words
 
-One of the simpler things to do with text is to treat each text as a "bag of words". We'll use the `tidytext` package's classification of sentiments dataset.
+One of the simpler things to do with text is to treat each text as a "bag of words". We have used the `tm` package in order to construct a Term Document Matrix but the computer couldn't handle such  huge dimensions. So let's go with `tidytext`
+
+
+### Text tidiying
+
+Do a serie of transformations :
+
+- lowecase
+- remove punctutations
+- strip whitespace
 
 ```{r}
-sentiments
+df$reviewText <- gsub( "[^a-zA-Z]", "\\1 \\2", tolower(df$reviewText))
+df$reviewText <- gsub( " +", " ", df$reviewText)
 ```
 
-This dataset associates each word with one or more moods, such as "anger", "joy", or "sadness".
+Use `nrc` lexicon as a bag of words that have sentiments but we're not going to look into these sentiments for the time being.
 
 ```{r}
 bow <- sentiments %>%
     filter(lexicon == "nrc") %>%
-    dplyr::select(word, sentiment)
+    dplyr::select(word)
 ```
 
-Now start by tokenizing the text of each review from the bag of words. Tokenize into words using the unnest_tokens  function.
-Then match word-sentiment pairs from `bow` to our reviewtext. We use inner_join function from dplyr.
+
+### Creating features from Bag of Words
+
+Use `unrest_tokens` and join function in order to convert our reviews into a sparse Matrix.
+
 
 ```{r}
-
-words <- df %>%
+Xdf <- df %>%
     unnest_tokens(word, reviewText) %>%
     filter(!word %in% stop_words$word) %>%
     inner_join(bow) %>%
-    count(sentiment, id) %>%
-    spread(sentiment, n, fill = 0)
+    count(word, id) %>%
+    spread(word, n, fill = 0) %>%
+    dplyr::select(-id)
 
-## join back to the intial data frame
-words <- df %>% inner_join(words, by="id")  %>% dplyr::select(-reviewText, -id)
+# we transpose id because we want docunent as 
+Xmat <- as.matrix(Xdf)
+dim(Xmat)
+```
 
-## reorder columns and rename rating as `y`
-colnames(words)[1] <- "y"
+### Reduce dimensionality (Single Vector Decomposition)
 
+Suppose we have m words (features) and n documents 
+Single vector decomposition (SVD) of an m*n real or complex matrix X is a factorization of the form :
+
+
+$$\mathbf{ X = U \Sigma V^{T} }$$
+$$ U\ is\ m x r\ matrix,\ columns\ of\ U\ contain\ the\ Eigenvectors\ of\ X \cdot X^{T} $$
+$$ V\ is\ an\ r x n,\ columns\ of\ V\ contain\ the\ Eigenvectors\ of\ X^{T} \cdot X $$
+$$ \Sigma\ is\ a\ diagonal\ r x r\ matrix.\ diagonal\ values\ are\ eigenvalues\ of\ X \cdot X^{T}$$
+
+It's basically a PCA but without mean shifting.
+
+```{r}
+Xmat.svd <- svd(Xmat, nu=30, LINPACK=T)
+save(Xmat.svd, file=paste(this.dir, "Xmat.svd", ".RData", sep=""))
+#load(paste(this.dir, 'Xmat.svd', '.RData', sep=''))
+
+dim(Xmat.svd$u)
+length(Xmat.svd$d)
+dim(Xmat.svd$v)
+```
+
+U matrix dimension is : 5x5
+d (sigma) matrix is   : 5x5
+V (sigma) matrix is   : x5
+
+The diagonal vector d generated is ordered by importance of each dimension.
+Let's graph a cumulative variance 
+
+```{r}
+#Xmat.svd$d
+s <- sum(Xmat.svd$d)
+d <- data.frame(var = cumsum(Xmat.svd$d^2/sum(Xmat.svd$d^2)))
+ggplot(d, aes(x=1:nrow(d), y=var)) + geom_line() #+ scale_x_log10()
+```
+
+### Design decision
+We have to decide how many dimensions to keep. Looking at the graph we can keep 10 dimensions which represent almost 99%.
+This is curious and a puzzling choice to make. But let's aim for fast processing.
+Let's visualize thigs
+
+```{r}
+#round(Xmat.svd$u %*% diag(Xmat.svd$d) %*% t(Xmat.svd$v))
+
+pc.use <- 20
+recon <- round(Xmat.svd$u[,1:pc.use] %*% diag(Xmat.svd$d[1:pc.use]) %*% t(Xmat.svd$v[,1:pc.use]))
 
 ```
 
-TF-IDF
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### TF-IDF
+
+Term Frequency - Inverse Document Frequency is term count within a document weighted against the term's ubiquity within the corpus. This weight is based on the principle that terms occurring in almost every document are therefore less specific to an individual document and should be scaled down. 
+So a tf-idf value represents the term's relative importance within a document.
 
 Compute tf-idf, inverse document frequency, and relative term frequency on document-feature matrices
 
 $$tf(t,d) = \frac{f_{d}(t)}{\underset{w \in d}{max}}$$
-$$idf(t,D) =\frac{|D|}{|d \in D : t \in d|}$$
-$$tfidf(t,d,D)=tf(t,d)\cdot idf(t,D)$$
+$$idf(t,D) = log \left (\frac{|D|}{|d \in D : t \in d|}  \right )$$
+$$tfidf(t,d,D) = tf(t,d)\cdot idf(t,D)$$
 $$f_d(t) := freqency\ of\ term\ t\ in\ document\ d$$
-$$D := corpus\ of\ documents$$
+$$D : corpus\ of\ documents$$
+$$|D| : number\ of\ documents\ where\ the term\ t\appears $$
+$$|d \in D : t \in d|\ :\ number\ of\ documents\ where\ the\ term\ t\ appears $$
 
 ```{r}
 d <- words %>% dplyr::select(-y)
@@ -572,4 +703,11 @@ In this study we used a supervised machine learning approach and tried several c
 # summary of 5 methods
 benchmark %>% kable
 ```
+
+
+
+
+
+
+
 
