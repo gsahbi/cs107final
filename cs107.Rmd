@@ -14,7 +14,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introduction
 ## Motivation :
-Sentiment Analysis, is receiving a big attention these days, because of its huge specrum of applications ranging from product review analysis, compain feedback, competition benchmarking, customer profiles, political trends, etc...
+Sentiment Analysis, is receiving a big attention these days, because of its huge spectrum of applications ranging from product review analysis, campaign feedback, competition bench-marking, customer profiles, political trends, etc...
 
 There is a huge flow of information going through the internet and social networks. Online discussions are only relevant to people for a couple of days. Nobody actually goes in past to tweets that are older than maybe a week, for instance. This entire humanity archive of discussion could help in many applications if we train machines to understand the sentiment of people towards a specific theme at a specific time. 
 
@@ -30,7 +30,7 @@ There are several things to take into consideration when approaching a Sentiment
 
 - Sentiment lexicons using Natural Language Processing (NLP) techniques. A Sentiment lexicon is a list of words that are associated to polarity values (positive or negative). NLP techniques offer a deep level of analysis since they take into account the context words in the sentence. 
 
-- Machine Learning classification algorithms. Because sentiment classification is a text classification problem, any existing supervised learning method can be directly applied [Bing Liu]. For example,  naïve Bayes classification , logistic regression, support vector machines (SVM), etc..
+- Machine Learning classification algorithms. Because sentiment classification is a text classification problem, any existing supervised learning method can be directly applied [Bing Liu]. For example,  naive Bayes classification , logistic regression, support vector machines (SVM), etc..
 
 In this work we'll work on ML classification and then try to get into the NLP and experience some of the basic techniques used.
 
@@ -60,11 +60,11 @@ sapply(libs, require, character.only=TRUE)
 
 ### Load data
 
-In this work we'll use a dataset that we obtained thankfully from Julian McAuley, at the University of San Diego (here)[http://jmcauley.ucsd.edu/data/amazon/] 
+In this work we'll use a data-set that we obtained thankfully from Julian McAuley, at the University of San Diego (here)[http://jmcauley.ucsd.edu/data/amazon/] 
 
-We'll be also inspired by their SIGIR and KDD papers (listed on the above page) as a baseline for our accuracy benchmarking.
+We'll be also inspired by their SIGIR and KDD papers (listed on the above page) as a baseline for our accuracy bench-marking.
 
-This dataset contains product reviews and metadata from Amazon, including 142.8 million reviews spanning May 1996 - July 2014. 
+This data-set contains product reviews and metadata from Amazon, including 142.8 million reviews spanning May 1996 - July 2014. 
 We have decided to use electronics reviews for this work. Because electronics are not perfect so create a lot of contrasted opinions.
  
 
@@ -77,7 +77,7 @@ setwd(this.dir)
 json_file <- "reviews_electronics_extract.json.gz"
 ```
 
-The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the approriate way of to load the data into a data frame.
+The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the appropriate way of to load the data into a data frame.
 
 ```{r cache=TRUE}
 dat <- stream_in(gzfile(json_file), verbose = FALSE)
@@ -99,7 +99,7 @@ Checking how many users are there. Almost we have 46K users for 50K reviews. So 
 n_distinct(dat$reviewerID)
 ```
 
-Checking how many products are there using the distinct ASIN (Amazon Standard Identification Number) amazon's unique product idenntifier. 
+Checking how many products are there using the distinct ASIN (Amazon Standard Identification Number) amazon's unique product identifier. 
 
 ```{r}
 n_distinct(dat$asin)
@@ -268,11 +268,11 @@ wordcloud(words = emo_neg$word, freq = emo_neg$n, scale=c(5,0.5), max.words=100,
 
 ## Text tidiying
 
-Do a serie of transformations :
+Do a series of transformations :
 
-- lowecase
-- remove punctutations
-- strip whitespace
+- lowercase
+- remove punctuation
+- strip white space
 
 ```{r}
 df$reviewText <- gsub( "[^a-zA-Z]", "\\1 \\2", tolower(df$reviewText))
@@ -655,7 +655,7 @@ In our work, we use the OpenNLP chunker. This chunker will split a given text in
 
 openNLP `Maxent_Chunk_Annotator` requires a pre-made models. These are conveniently available to R by installing the respective `openNLPmodels.language` package from the repository at http://datacube.wu.ac.at
 
-To install english language model (a heavy download 74MB) :
+To install English language model (a heavy download 74MB) :
 `install.packages("openNLPmodels.en", repos = "http://datacube.wu.ac.at")`
 
 
@@ -665,7 +665,7 @@ library(openNLP)
 library(openNLPmodels.en)
 ```
 
-In the following, we'll experiment with a 1-star rated wireless charger from Amazon. And to evaluate this chuncker we selected a text with a lot of grammer and orthograph mistakes:
+In the following, we'll experiment with a 1-star rated wireless charger from Amazon. And to evaluate this chuncker we selected a text with a lot of grammar and orthographic mistakes:
 
 Fix punctuation issues in this example "best.I" using `gsub` from the `stringr` package.
 
@@ -725,7 +725,7 @@ The third its chunk tag.
 
 ### Feature identification
 
-Now we want to identify features. For the purpose of this work we won't go for a full analysis using penn tree. Rather we'll simply identify the following words indise a verbal phrase:
+Now we want to identify features. For the purpose of this work we won't go for a full analysis using penn tree. Rather we'll simply identify the following words inside a verbal phrase:
 
 - [VB] : verb w/ positive/negative sentiment : like, hate , etc
 - [JJ] : adjective w/ positive/negative sentiment : bad, junk
