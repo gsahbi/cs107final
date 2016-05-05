@@ -1,3 +1,5 @@
+![](http://i.imgur.com/wYyRKNn.png?1)
+
 # Introduction
 ## Motivation :
 Sentiment Analysis, is receiving a big attention these days, because of its huge spectrum of applications ranging from product review analysis, campaign feedback, competition bench-marking, customer profiles, political trends, etc...
@@ -25,41 +27,39 @@ In this work we'll work on ML classification and then try to get into the NLP an
 
 ### Load data
 
-In this work we'll use a data-set that we obtained thankfully from Julian McAuley, at the University of San Diego (here)[http://jmcauley.ucsd.edu/data/amazon/] 
+In this work we'll use a data-set that we obtained thankfully from (Julian McAuley)[http://cseweb.ucsd.edu/~jmcauley/], at the University of San Diego (here)[http://jmcauley.ucsd.edu/data/amazon/] 
 
-We'll be also inspired by their SIGIR and KDD papers (listed on the above page) as a baseline for our accuracy bench-marking.
+It is worth mentioning, their excellent work in SIGIR and KDD papers (listed on the above page).
 
-This data-set contains product reviews and metadata from Amazon, including 142.8 million reviews spanning May 1996 - July 2014. 
-We have decided to use electronics reviews for this work. Because electronics are not perfect so create a lot of contrasted opinions.
+This data-set contains a NJSON formatted product reviews and metadata from Amazon, including 142.8 million reviews spanning May 1996 - July 2014. We have decided to use electronics reviews for this work. Because electronics are not perfect so create a lot of contrasted opinions.
  
-
-The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the appropriate way of to load the data into a data frame.
-
-
-
 ## Exploratory Data Analysis
 ### Basic numbers
-Let's explore some facts about our data.
+Let's explore some facts about our data. This is an example of rows :
+
 
 Checking how many users are there. Almost we have 46K users for 50K reviews. So each user has done 1 unique review per product.
 
+
+[[[[ IMAGE ]]]]
 
 
 Checking how many products are there using the distinct ASIN (Amazon Standard Identification Number) amazon's unique product identifier. 
 
 
+[[[[ IMAGE ]]]]
 
-Let's look at at the the number of ratings per product. It's quite skewed with some extreme best sellers (a headphone from Koss) having 3000 reviews. 
+
+Let's look at at the the number of ratings per product. 
 
 
+[[[[ IMAGE ]]]]
+
+
+
+It's quite skewed with some extreme best sellers (a headphone from Koss) having 3000 reviews. 
 
 ### Simplification of data
-
-Prepare the text for processing, convert it to lower case, and keep only relevant columns.
-We then garbage collect the old `dat`
-
-
-
 
 ### Rating system in Amazon
 
@@ -75,7 +75,7 @@ The rating system used in Amazon is as follows :
 
 Let's see the distribution of these ratings in our case
 
-
+[[[[ IMAGE ]]]]
 
 > The ratings are very skewed towards positive feedback. Which is an indication that Amazon is not selling junk at least but it's not going to help in our modeling. We have to have equal likelihood of each class of the ratings. 
 
@@ -97,53 +97,26 @@ Let's check again the distribution of opinions
 
 
 
-Even after this mapping the class proportions need to be corrected manually.
-We calculate the skew (disproportion rate)
-
-
-
-we have 3x more Positive than Negative. Let's remove 2/3 of Positive to adjust the proportions
-
-
-
-Check the numbers, we are good to go :
-
+Even after this mapping the class proportions need to be corrected manually. The disproportion rate is 3 (3x more Positive than Negative ratings). So, we'll remove 2/3 of Positive to adjust the proportions
 
 
 # Machine Learning Classification
+## The classigication process
+
+[[[[ IMAGE ]]]]
 
 ## Bag of Words
 
-One of the simpler things to do with text is to treat each text as a "bag of words". We have used the `tm` package in order to construct a Term Document Matrix but the computer couldn't handle such  huge dimensions. So let's go with `tidytext`
+[[[[ Illustration ]]]]
+
+One of the simpler things to do with text is to treat each text as a "bag of words". We have used the `tm` package in order to construct a Term Document Matrix but our machine couldn't handle such huge number of dimensions. So let's go simpler with `tidytext`
 
 Let's discover the top words for both positive and negative ratings. We use the `wordcloud` package to have a nice display. 
 
 
-
-
-
-
-## Text tidiying
-
-Do a series of transformations :
-
-- lowercase
-- remove punctuation
-- strip white space
-
-
-
-Use `nrc` lexicon as a bag of words that have sentiments but we're not going to look into these sentiments for the time being.
-
-
-
-
 ## Creating features from Bag of Words
 
-Use `unrest_tokens` and join function in order to convert our reviews into a sparse Matrix.
-
-
-
+Use `nrc` lexicon as a bag of words that have sentiments but we're not going to use these sentiments for the time being. 
 
 ## TF-IDF
 
@@ -361,6 +334,5 @@ Now we need to wrap all above into a function
 
 
 Apply it to a number of review texts .
-
 
 

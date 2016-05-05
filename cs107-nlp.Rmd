@@ -1,0 +1,560 @@
+---
+title: 'CS107 Final Froject : Sentiment Analysis of Product Reviews'
+author: "Sahbi Ben Gdaiem, Mohammed Hadj-Ali"
+date: "April 27, 2016"
+output: 
+  html_document:
+    toc: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+```
+
+# PART II : Sentiment lexicons using Natural Language Processing
+
+## Background
+
+In the machine learning classification models based on words we've seen that many false positives originate from negations. such as this :
+
+
+In our work, we use the OpenNLP chunker. This chunker will split a given text into a sequence of semantically correlated phrases but does not specify their internal structure, nor their role in the main sentence.
+
+openNLP `Maxent_Chunk_Annotator` requires a pre-made models. These are conveniently available to R by installing the respective `openNLPmodels.language` package from the repository at http://datacube.wu.ac.at
+
+To install English language model (a heavy download 74MB) :
+`install.packages("openNLPmodels.en", repos = "http://datacube.wu.ac.at")`
+
+
+```{r message=FALSE,echo=FALSE}
+# Specify and load required R packages. 
+libs = c(
+  "jsonlite",    ##  loading JSON data input 
+  "caret",       ##  confusion matrix
+  "stringr",     ##  gsub
+  "knitr",       ##  kable
+  "ggplot2",     ##  for plots
+  "plyr",         ##  map columns
+  "dplyr",       ##  for dataframe wrangling
+  "wordcloud",   ##  word cloud
+  "tidyr",       ##  ubiquitous
+  "tidytext",   ##  tokenizer and sentiment dataset
+  "NLP",
+  "openNLP",
+  "openNLPmodels.en"
+)
+
+sapply(libs, require, character.only=TRUE)
+```
+
+
+## Data Wrangling and Preparation
+ 
+
+```{r }
+# TODO: Set working directory to where this script is (avoid hardcoded paths)
+this.dir <- "/mnt/hgfs/final project/cs107final/"
+setwd(this.dir)
+
+#json_file <- "data/reviews_electronics_extract.json"
+json_file <- "data/reviews_electronics_extract.json.gz"
+```
+
+The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the appropriate way of to load the data into a data frame.
+
+```{r cache=TRUE}
+dat <- stream_in(gzfile(json_file), verbose = FALSE)
+
+df <- dat %>% dplyr::mutate(reviewText = reviewText) %>% 
+              dplyr::select(reviewText, overall)
+
+# We will collapse the 3, 4 and 5 stars ratings into “1” value, and the 1 and 2 stars ratings into Negative “0”
+
+overall <-seq(1,5)
+rating <- c(0,0,0,1,1)
+trans <- data.frame(cbind(overall, rating))
+
+df <- df %>% 
+     # filter(overall != 3)  %>% 
+      left_join(trans) %>% 
+      dplyr::select(-overall) %>% 
+      dplyr::mutate(id = row_number()) 
+
+n_remov <- sum(df$rating == 1) - sum(df$rating == 0)
+positive_ids <- df$id[df$rating == 1]
+remove_ids <-  sample(positive_ids, n_remov)
+
+## remove these rows
+df3 <- df[-remove_ids,]
+## clean up things
+df <- df3
+rm(df3, dat, positive_ids, remove_ids)
+gc()
+```
+
+Do a series of transformations :
+
+- lowercase
+- remove punctuation
+- strip white space
+
+```{r}
+df$reviewText <- gsub( "([\\.\\,\\!\\?])([^ ]+)", "\\1 \\2", tolower(df$reviewText))
+df$reviewText <- gsub( " +", " ", df$reviewText)
+```
+
+## No-brainer classification using lexicons
+
+Let's do a basic sentiment analysis from a categorized bag of words, we'll use the Bing lexison provided by `tidytext` package `sentiments`  :
+
+### Sentiment Lexicons
+
+Extract a lexicon from Bing
+
+```{r}
+bow <- sentiments %>% 
+        filter(lexicon == "bing" & sentiment %in% c("negative", "positive"))  %>%
+        dplyr::select(word,sentiment)
+```
+
+### Classification
+
+```{r}
+## Calcualate the frequency of each sentiment in each text
+Z <- df %>%
+    unnest_tokens(word, reviewText) %>%
+    filter(!word %in% stop_words$word) %>%
+    inner_join(bow) %>%
+    dplyr::count(sentiment, id) %>%
+    spread(sentiment, n, fill = 0)
+
+## a simple measurement    
+Z <- Z %>% left_join(df, by = "id") %>% 
+      dplyr::mutate(y_hat = (positive-negative)/(positive+negative+1))
+
+Z  %>%
+    ggplot(aes(positive, negative, color=factor(rating ))) + 
+    geom_jitter() 
+
+
+## function to calcualte accuracy
+accuracy <- function(true_, predicted_) 
+{
+	true_ <- as.vector(true_)
+	predicted_ <- as.vector(predicted_, mode=class(true_))
+	res <- predicted_ == true_
+
+	accuracy <- length(res[res == TRUE])/length(true_)
+	return(accuracy)
+}
+
+
+table(Z$rating ,  (Z$y_hat >= 0) + 0)
+accuracy(Z$rating,  (Z$y_hat >= 0) + 0)
+```
+
+### Evaluation of the results
+
+To find out what we can enhance, let's show what words are  
+Visualize this bag of words
+
+```{r}
+emo_pos <- df %>% filter(rating == 1)  %>%
+            unnest_tokens(word, reviewText)  %>%
+            filter(!word %in% stop_words$word) %>%
+            inner_join(bow) %>%
+            dplyr::count(word) 
+
+emo_neg <- df %>% filter(rating == 0)  %>%
+            unnest_tokens(word, reviewText)  %>%
+            filter(!word %in% stop_words$word) %>%
+            inner_join(bow) %>%
+            dplyr::count(word) 
+
+layout(matrix(c(1:4), nrow=2, ncol = 2), heights=c(1, 4))
+par(mar=rep(0, 4))
+plot.new()
+text(x=0.5, y=0.5, "Positive ratings", cex=2)
+
+wordcloud(words = emo_pos$word, freq = emo_pos$n, scale=c(5,0.5), max.words=100, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
+
+plot.new()
+text(x=0.5, y=0.5, "Negative ratings", cex=2)
+
+wordcloud(words = emo_neg$word, freq = emo_neg$n, scale=c(5,0.5), max.words=100, random.order=FALSE, rot.per=0.35, use.r.layout=FALSE, colors=brewer.pal(8, "Dark2"))
+```
+
+Many negative words are found in positive ratings. This is due to the negations and polarity inverter adjectives.
+For example : Not bad, would account for negative.
+
+```{r}
+# more examples of false positives
+
+Z %>% filter(rating == 0 & y_hat >= 0) %>% 
+      sample_n(10) %>%
+      mutate(reviewText = substring(reviewText,1,66),
+             y_hat = ( y_hat >= 0) + 0  
+             ) %>%
+      kable
+```
+
+
+In the next portion, we'll try to use NLP to enhance our classification.
+
+
+## A more sophisticated Classification
+
+In the following, we'll experiment with a 1-star rated wireless charger from Amazon. This particular review would count for a positive prediction using models that do not take into account the semantics:
+
+Fix punctuation issues in this example "best.I" using `gsub` from the `stringr` package.
+
+```{r}
+txt <- c("Bought it in Black Friday sales for good price.I don't like it.not wanna recommend to anybody.")
+#txt <- c("no problems!")
+
+txt <- gsub( "([\\.\\,\\!\\?])([^ ]+)", "\\1 \\2", txt)
+s <- as.String(txt)
+
+```
+
+
+## Sentence chunking and Part-of-Speech tagging
+
+
+The first step is to extract 2 types of phrases :
+- Verbal phrases  that may imply opinions. Example : "I didn't like the design"
+- Noun phrases that may describe the product. Example : The design was not good""
+
+
+The part-of-speech tags meaning is found in the [Penn Treebank Project](https://www.ling.upenn.edu/courses/Fall_2003/ling001/penn_treebank_pos.html)
+
+
+Extracting Sentences POS tagging
+
+```{r}
+sent_token_annotator <- Maxent_Sent_Token_Annotator()
+word_token_annotator <- Maxent_Word_Token_Annotator()
+parse_annotator <- Parse_Annotator()
+pos_tag_annotator <- Maxent_POS_Tag_Annotator()
+
+a2 <- annotate(s, list(sent_token_annotator, word_token_annotator,pos_tag_annotator))
+
+```
+
+
+This `parse2graph` code is courtesy from (StackOverflow)[http://stackoverflow.com/questions/33473107/visualize-parse-tree-structure]
+
+```{r echo=F}
+
+## Make a graph from Tree_parse result
+parse2graph <- function(ptext, leaf.color='chartreuse4', label.color='blue4',
+                        title=NULL, cex.main=.9, ...) {
+    stopifnot(require(NLP) && require(igraph))
+
+    ## Replace words with unique versions
+    ms <- gregexpr("[^() ]+", ptext)                                      # just ignoring spaces and brackets?
+    words <- regmatches(ptext, ms)[[1]]                                   # just words
+    regmatches(ptext, ms) <- list(paste0(words, seq.int(length(words))))  # add id to words
+
+    ## Going to construct an edgelist and pass that to igraph
+    ## allocate here since we know the size (number of nodes - 1) and -1 more to exclude 'TOP'
+    edgelist <- matrix('', nrow=length(words)-2, ncol=2)
+
+    ## Function to fill in edgelist in place
+    edgemaker <- (function() {
+        i <- 0                                       # row counter
+        g <- function(node) {                        # the recursive function
+            if (inherits(node, "Tree")) {            # only recurse subtrees
+                if ((val <- node$value) != 'TOP1') { # skip 'TOP' node (added '1' above)
+                    for (child in node$children) {
+                        childval <- if(inherits(child, "Tree")) child$value else child
+                        i <<- i+1
+                        edgelist[i,1:2] <<- c(val, childval)
+                    }
+                }
+                invisible(lapply(node$children, g))
+            }
+        }
+    })()
+
+    ## Create the edgelist from the parse tree
+    edgemaker(Tree_parse(ptext))
+
+    ## Make the graph, add options for coloring leaves separately
+    g <- graph_from_edgelist(edgelist)
+    vertex_attr(g, 'label.color') <- label.color  # non-leaf colors
+    vertex_attr(g, 'label.color', V(g)[!degree(g, mode='out')]) <- leaf.color
+    V(g)$label <- sub("\\d+", '', V(g)$name)      # remove the numbers for labels
+    plot(g, layout=layout.reingold.tilford, ...)
+    if (!missing(title)) title(title, cex.main=cex.main)
+}
+```
+
+Visualize the sentences in a treebank 
+
+```{r echo=F}
+
+# Hack to reset par
+resetLayout <- function() {
+    dev.new()
+    op <- par(no.readonly = TRUE)
+    dev.off()
+    op
+}
+```
+
+
+```{r}
+invisible({
+  ## extract tree annotations
+  p <- parse_annotator(s, a2)
+  ptext <- sapply(p$features, `[[`, "parse") 
+  
+  ## define a layout
+  layout(matrix(c(1:4), nrow=2, ncol = 2), heights=c(1, 1))
+  par(mar=rep(0, 4))
+
+  ## draw sentences
+  lapply(ptext, function (t) {
+  parse2graph(t,  # plus optional graphing parameters
+            vertex.color=NA, vertex.frame.color=NA,
+            vertex.label.font=1, vertex.label.cex=1,
+            edge.label.cex=4, edge.width=1.5, edge.color='black', edge.arrow.size=0)
+  })
+  par(resetLayout())
+})
+```
+
+As we can see from the graphs, the ideal approach is to score each leaf and propagate the scores (like in Stanford's NLP engine). But let's keep it simple and propagate the negations from Adverbs to verbs and adjectives that have sentiments on them, namely negation-of-adjective (NOA) and negation-of-verb (NOV).
+
+Transform it to  [word, part-of-speech-tag] dataframe 
+
+```{r}
+words <- subset(a2, type == "word")
+
+chk_df <- as.data.frame(words) %>% 
+  dplyr::mutate(word = s[words],
+         tag1 = sapply(features, '[[', "POS"),
+         tag = substring(tag1,1,2) ## remove verb tense
+         ) %>% 
+  dplyr::select (word,tag)
+
+## preview
+chk_df %>% head(10) %>% kable
+```
+
+
+### Feature identification
+
+For the purpose of this work we won't go for a full analysis using penn treebanks. Rather we'll simply identify the following words inside a verbal and noun chunks (phrase):
+
+- [VB] : verb w/ positive/negative sentiment : like, hate , etc
+- [JJ] : adjective w/ positive/negative sentiment : bad, junk
+- [RB] : adverb polarity inverter such as : n't, or incr/decrementers such as : too, very, more etc.
+
+First, let's use `tidytext` `sentiments` 
+
+```{r}
+dict <- sentiments %>% 
+        filter(lexicon == "bing" & sentiment %in% c("negative", "positive"))  %>%
+        dplyr::select(word,sentiment)
+```
+
+Transform each sentiment to it's score (+1, -1)
+
+```{r}
+dict$sentiment <- as.numeric( mapvalues(dict$sentiment, 
+          from=c("negative","positive"), 
+          to=c(-1,1)))
+```
+
+Next prepare inverter and incrementer/decrementers maps
+
+```{r}
+
+## inverters
+inv_  <- c("never", "no", "nothing", "nowhere", "noone", "none", "not", "n't")
+inv_ <- data.frame(word = as.character(inv_), multiplier = rep(-1, length(inv_)), stringsAsFactors = F)
+
+## incrementer/decrementers
+inc_ <- c("too", "very", "extremly", "badly", "poorly" )
+inc_ <-  data.frame(word = as.character(inc_), multiplier = c(2,2,2,.5,.5), stringsAsFactors = F)
+
+#dico <- rbind(inv_,inc_) 
+```
+
+Let's apply the scores and multipliers using `left_join`
+
+
+```{r}
+wds <- chk_df %>% left_join(dict) %>% left_join(inv_) 
+wds$sentiment[is.na(wds$sentiment)] <- 0
+```
+
+## Scoring algorithm
+
+The idea is to find RB multiplier and look for a VB or JJ surrounding it :
+
+For example : n't like : will compute 1 x -1
+
+```{r}
+## find adverbs :
+wds.RB <- which(wds$tag %in% c("RB", "DT") & !is.na(wds$multiplier))
+wds.len <- nrow(wds)
+lapply(wds.RB, function (i){
+    k <- i+1
+    while (k<=wds.len & k<=i+2) {
+      if (wds$tag[k] %in% c("JJ","VB", "NN")) {
+          wds$sentiment[k] <<-  wds$sentiment[k] * wds$multiplier[i]
+      }
+      k <- k + 1
+    }
+}) 
+wds
+```
+
+We should be able to calculate our sentiment score as the diff between negative and positive counts normalized by the count + 1
+
+```{r}
+sum(wds$sentiment)/sum(wds$sentiment != 0)
+```
+
+## Generalization
+
+Let's wrap all above into a function 
+
+```{r}
+
+estimate_sentiment = function(x) {
+      x <- as.String(x)
+      a2 <- annotate(x, list(sent_token_annotator, word_token_annotator,pos_tag_annotator))
+      words <- subset(a2, type == "word")
+      
+      chk_df <- as.data.frame(words) %>% 
+            dplyr::mutate(word = x[words],
+               tag1 = sapply(features, '[[', "POS"),
+               tag = substring(tag1,1,2) ## remove verb tense
+               ) %>% 
+            dplyr::select (word,tag)
+      wds <<- chk_df %>% left_join(dict, by="word") %>% left_join(inv_, by="word")
+      wds$sentiment[is.na(wds$sentiment)] <- 0    
+      ## find adverbs :
+      wds.RB <- which(wds$tag %in% c("RB", "DT") & !is.na(wds$multiplier))
+      wds.len <- nrow(wds)
+      lapply(wds.RB, function (i){
+          k <- i+1
+          while (k<=wds.len & k<=i+2) {
+            if (wds$tag[k] %in% c("JJ","VB", "NN")) {
+                wds$sentiment[k] <<-  wds$sentiment[k] * wds$multiplier[i]
+            }
+            k <- k + 1
+          }
+      }) 
+      list(positive = sum(wds$sentiment > 0) , negative = sum(wds$sentiment < 0))
+}
+```
+
+Apply it to a number of review texts .
+
+```{r}
+
+xtract <- df %>% filter(nchar(reviewText) > 8)  %>% sample_n(2000)
+senti <- lapply(xtract$reviewText, estimate_sentiment)
+
+X <- data.frame( y = xtract$rating,
+                  negative = sapply(senti, '[[', "negative"),
+                  positive = sapply(senti, '[[', "positive"),
+                 text = xtract$reviewText)
+
+X_h <- X %>% dplyr::mutate(y_hat = (positive-negative)/(positive+negative+1))
+
+```
+
+Accuracy
+
+```{r}
+
+table(X_h$y ,  (X_h$y_hat > 0) + 0)
+accuracy(X_h$y,  (X_h$y_hat > 0) + 0)
+
+## misses
+
+X_h %>%  filter(y != (X_h$y_hat > 0) + 0) %>% 
+      sample_n(10) %>%
+      mutate(text = substring(text,1,66),
+             y_hat = ( y_hat >= 0) + 0  
+             ) %>%
+      kable
+##
+
+hist(X_h$y_hat, 
+     main="Histogram of classification (5 classes)",
+     xlab="Predicted score")
+
+X_h  %>%
+    ggplot(aes(positive, negative, color=factor(y))) + 
+    geom_jitter() 
+
+```
+
+
+## Interpretation 
+
+```{r}
+
+# plot the distribution of positive ,  
+
+X_h %>% filter(y_hat > 0) %>% ggplot(aes(y_hat)) + geom_histogram()
+
+# Due to heavy calculation cost we can't process large number of samples. But should look like a normal distribution. Then we can calculate the mean and sd 
+
+
+```
+
+
+## glm on this data :
+```{r}
+## glm
+glm.model <- glm(y~positive + negative, data=X, family=binomial)
+
+glm.pred <- predict(glm.model, newdata=X, type="response") 
+summary(glm.model)
+
+## compute lr confusion matrix assuming a cutoff at 0.5
+table(X$y, glm.pred>.5) 
+
+## compute lr accuracy
+accuracy(X$y, glm.pred>.5)
+```
+
+## random Forest
+
+```{r}
+require(randomForest)
+rf.fit <- randomForest(as.factor(y) ~ positive + negative, 
+                       data=X, 
+                       importance=TRUE, 
+                       mtry = 3, 
+                       ntree=2000)
+
+rf.pred <- predict(rf.fit, newdata = X, type="response" )
+
+## compute confusion matrix 
+table(as.factor(X$y), rf.pred ) 
+
+## compute accuracy
+rf.accuracy <- accuracy(as.factor(X$y), rf.pred );rf.accuracy
+
+```
+
+
+
+# Conclusion
+
+Some of the basic techniques of NLP can enhance the accuracy of sentiment scoring. We went from 68% to 74% with a simple identification of negation-of-adjective (NOA) and negation-of-verb (NOV). And using a randomForest algorithm we achieved nearly 78% accuracy.
+
+But, some language forms require a deep analysis. For example :
+
+Sarcasm : "Great sound when working"
+Deep inverter : "Not such a good value after all", polarity inverter adverb is 3-words faraway from its adjective.
