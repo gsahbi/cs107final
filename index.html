@@ -31,15 +31,19 @@
         <hr>
 
         <section id="main_content">
-          <p><img src="http://i.imgur.com/wYyRKNn.png" alt=""></p>
+          <p><img src="http://i.imgur.com/wYyRKNn.png?1" alt=""></p>
 
 <h1>
-<a id="introduction" class="anchor" href="#introduction" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Introduction</h1>
+<a id="project-overview" class="anchor" href="#project-overview" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Project Overview</h1>
+
+<hr>
 
 <h2>
 <a id="motivation-" class="anchor" href="#motivation-" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Motivation :</h2>
 
 <p>Sentiment Analysis, is receiving a big attention these days, because of its huge spectrum of applications ranging from product review analysis, campaign feedback, competition bench-marking, customer profiles, political trends, etc...</p>
+
+<p></p><img src="http://i.imgur.com/hFwQEH3.jpg?1">
 
 <p>There is a huge flow of information going through the internet and social networks. Online discussions are only relevant to people for a couple of days. Nobody actually goes in past to tweets that are older than maybe a week, for instance. This entire humanity archive of discussion could help in many applications if we train machines to understand the sentiment of people towards a specific theme at a specific time. </p>
 
@@ -50,58 +54,54 @@
 
 <p>Given the large amount of data available on the Web, it is now possible to investigate high-level Information Retrieval tasks like user's intentions and feelings about facts or objects discussed. [Pang, B., Lee, L., 2008. Opinion mining and sentiment analysis. Foundations and Trends in Information Retrieval] </p>
 
-<h1>
-<a id="sentiment-analyis" class="anchor" href="#sentiment-analyis" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sentiment Analyis</h1>
-
 <h2>
 <a id="challenge-" class="anchor" href="#challenge-" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Challenge :</h2>
 
 <p>There are several things to take into consideration when approaching a Sentiment Analysis task. In general, there are two main approaches: </p>
 
 <ul>
-<li><p>Sentiment lexicons using Natural Language Processing (NLP) techniques. A Sentiment lexicon is a list of words that are associated to polarity values (positive or negative). NLP techniques offer a deep level of analysis since they take into account the context words in the sentence. </p></li>
-<li><p>Machine Learning classification algorithms. Because sentiment classification is a text classification problem, any existing supervised learning method can be directly applied [Bing Liu]. For example,  naive Bayes classification , logistic regression, support vector machines (SVM), etc..</p></li>
+<li><p><strong>Sentiment lexicons using Natural Language Processing (NLP) techniques</strong>. A Sentiment lexicon is a list of words that are associated to polarity values (positive or negative). NLP techniques offer a deep level of analysis since they take into account the context words in the sentence. </p></li>
+<li><p><strong>Machine Learning classification algorithms</strong>. Because sentiment classification is a text classification problem, any existing supervised learning method can be directly applied [Bing Liu]. For example,  naive Bayes classification , logistic regression, support vector machines (SVM), etc..</p></li>
 </ul>
 
 <p>In this work we'll work on ML classification and then try to get into the NLP and experience some of the basic techniques used.</p>
 
 <h2>
-<a id="data-wrangling-and-preparation" class="anchor" href="#data-wrangling-and-preparation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Data Wrangling and Preparation</h2>
+<a id="exploratory-data-analysis" class="anchor" href="#exploratory-data-analysis" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Exploratory Data Analysis</h2>
 
 <h3>
-<a id="load-data" class="anchor" href="#load-data" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Load data</h3>
+<a id="the-data" class="anchor" href="#the-data" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>The Data</h3>
 
-<p>In this work we'll use a data-set that we obtained thankfully from Julian McAuley, at the University of San Diego (here)[<a href="http://jmcauley.ucsd.edu/data/amazon/">http://jmcauley.ucsd.edu/data/amazon/</a>] </p>
+<p>In this work we'll use a data-set that we obtained thankfully from <a href="http://cseweb.ucsd.edu/%7Ejmcauley/">Julian McAuley</a>, at the University of San Diego <a href="http://jmcauley.ucsd.edu/data/amazon/">here</a>.</p>
 
-<p>We'll be also inspired by their SIGIR and KDD papers (listed on the above page) as a baseline for our accuracy bench-marking.</p>
+<p>It is worth mentioning, their excellent work in SIGIR and KDD papers (listed on the above page).</p>
 
-<p>This data-set contains product reviews and metadata from Amazon, including 142.8 million reviews spanning May 1996 - July 2014. 
-We have decided to use electronics reviews for this work. Because electronics are not perfect so create a lot of contrasted opinions.</p>
-
-<p>The file format is <strong>NDJSON</strong> (Newline Delimited JSON), So <code>stream_in</code> is the appropriate way of to load the data into a data frame.</p>
+<p>This data-set contains a NJSON formatted product reviews and metadata from Amazon, including 142.8 million reviews spanning May 1996 - July 2014. We have decided to use electronics reviews for this work. Because electronics are not perfect so create a lot of contrasted opinions.</p>
 
 <h2>
-<a id="exploratory-data-analysis" class="anchor" href="#exploratory-data-analysis" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Exploratory Data Analysis</h2>
+<a id="exploratory-data-analysis-1" class="anchor" href="#exploratory-data-analysis-1" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Exploratory Data Analysis</h2>
 
 <h3>
 <a id="basic-numbers" class="anchor" href="#basic-numbers" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Basic numbers</h3>
 
-<p>Let's explore some facts about our data.</p>
+<p>Let's explore some facts about our data. This is an example of rows :</p>
 
-<p>Checking how many users are there. Almost we have 46K users for 50K reviews. So each user has done 1 unique review per product.</p>
+<ul>
+<li><p>The number of unique users are almost 46K for 50K reviews. So each user has done 1 unique review per product.</p></li>
+<li><p>Using ASIN (Amazon Standard Identification Number) amazon's unique product identifier we find around <strong>3446</strong> products  </p></li>
+</ul>
 
-<p>Checking how many products are there using the distinct ASIN (Amazon Standard Identification Number) amazon's unique product identifier. </p>
+<p>Let's look at at the the number of ratings per product : </p>
 
-<p>Let's look at at the the number of ratings per product. It's quite skewed with some extreme best sellers (a headphone from Koss) having 3000 reviews. </p>
+<p></p><img src="http://i.imgur.com/hNUYmi9.png">
+
+<p>It's quite skewed with some extreme best sellers (a headphone from Koss) having 3000 reviews. </p>
 
 <h3>
 <a id="simplification-of-data" class="anchor" href="#simplification-of-data" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Simplification of data</h3>
 
-<p>Prepare the text for processing, convert it to lower case, and keep only relevant columns.
-We then garbage collect the old <code>dat</code></p>
-
 <h3>
-<a id="rating-system-in-amazon" class="anchor" href="#rating-system-in-amazon" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Rating system in Amazon</h3>
+<a id="understand-the-rating-system-in-amazon" class="anchor" href="#understand-the-rating-system-in-amazon" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Understand the rating system in Amazon</h3>
 
 <p>The rating system used in Amazon is as follows : </p>
 
@@ -113,14 +113,14 @@ We then garbage collect the old <code>dat</code></p>
 <li>emotional negative (1 star )</li>
 </ul>
 
-<p><strong>The user's star rating of his own review description as a subjective human interpretation of opinion. So, we consider that as the ground truth.</strong> </p>
+<p><strong>The user's star rating is an objective human interpretation of of his own review description. So, we consider that as the ground truth.</strong> </p>
 
 <p>Let's see the distribution of these ratings in our case</p>
 
+<p></p><img src="http://i.imgur.com/0kfA4Fr.png">
+
 <blockquote>
 <p>The ratings are very skewed towards positive feedback. Which is an indication that Amazon is not selling junk at least but it's not going to help in our modeling. We have to have equal likelihood of each class of the ratings. </p>
-
-<p>In the next sections we'll solve this.</p>
 </blockquote>
 
 <h2>
@@ -131,45 +131,30 @@ We objectively chose to demarcate each rating at the 2.x level divide, such that
 
 <p>We will collapse the 3, 4 and 5 stars ratings into “1” value, and the 1 and 2 stars ratings into Negative “0”</p>
 
-<p>So at the end we'll have only 2 opinions : negative/positive
-The simplest way to do this is by joining a mapping matrix</p>
+<p>So at the end we'll have only 2 opinions : negative/positive</p>
 
-<p>Let's check again the distribution of opinions</p>
-
-<p>Even after this mapping the class proportions need to be corrected manually.
-We calculate the skew (disproportion rate)</p>
-
-<p>we have 3x more Positive than Negative. Let's remove 2/3 of Positive to adjust the proportions</p>
-
-<p>Check the numbers, we are good to go :</p>
+<p></p><img src="http://i.imgur.com/gkeTY7a.png">
 
 <h1>
-<a id="machine-learning-classification" class="anchor" href="#machine-learning-classification" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Machine Learning Classification</h1>
+<a id="part-i---machine-learning-classification" class="anchor" href="#part-i---machine-learning-classification" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>PART I :  Machine Learning Classification</h1>
+
+<hr>
 
 <h2>
 <a id="bag-of-words" class="anchor" href="#bag-of-words" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bag of Words</h2>
 
-<p>One of the simpler things to do with text is to treat each text as a "bag of words". We have used the <code>tm</code> package in order to construct a Term Document Matrix but the computer couldn't handle such  huge dimensions. So let's go with <code>tidytext</code></p>
+<p></p><img src="http://i.imgur.com/r430Fjd.jpg?1">
+
+<p>One of the simplest things to do is to treat each text as a "bag of words". We have used the <code>tm</code> package in order to construct a Term Document Matrix but our machine couldn't handle such huge number of dimensions. So let's go simpler with <code>tidytext</code>. I fact we found that R as a framework is not as rich as Python Scikit in NLP. </p>
+
+<h2>
+<a id="feature-extraction-from-bag-of-words" class="anchor" href="#feature-extraction-from-bag-of-words" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Feature Extraction from Bag of Words</h2>
+
+<p>Use <code>nrc</code> lexicon as a bag of words in order to remove stemsords. This dataset has sentiments but we're not going to use them for the time being. </p>
 
 <p>Let's discover the top words for both positive and negative ratings. We use the <code>wordcloud</code> package to have a nice display. </p>
 
-<h2>
-<a id="text-tidiying" class="anchor" href="#text-tidiying" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Text tidiying</h2>
-
-<p>Do a series of transformations :</p>
-
-<ul>
-<li>lowercase</li>
-<li>remove punctuation</li>
-<li>strip white space</li>
-</ul>
-
-<p>Use <code>nrc</code> lexicon as a bag of words that have sentiments but we're not going to look into these sentiments for the time being.</p>
-
-<h2>
-<a id="creating-features-from-bag-of-words" class="anchor" href="#creating-features-from-bag-of-words" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Creating features from Bag of Words</h2>
-
-<p>Use <code>unrest_tokens</code> and join function in order to convert our reviews into a sparse Matrix.</p>
+<p></p><img src="http://i.imgur.com/gfHc6rd.png">
 
 <h2>
 <a id="tf-idf" class="anchor" href="#tf-idf" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>TF-IDF</h2>
@@ -177,114 +162,149 @@ We calculate the skew (disproportion rate)</p>
 <p>Term Frequency - Inverse Document Frequency is term count within a document weighted against the term's ubiquity within the corpus. This weight is based on the principle that terms occurring in almost every document are therefore less specific to an individual document and should be scaled down. 
 So a tf-idf value represents the term's relative importance within a document.</p>
 
-<p>Compute tf-idf, inverse document frequency, and relative term frequency on document-feature matrices</p>
-
-<p>$$tf(t,d) = \frac{f_{d}(t)}{\underset{w \in d}{max}}$$
-$$idf(t,D) = log \left (\frac{|D|}{|d \in D : t \in d|}  \right )$$
-$$tfidf(t,d,D) = tf(t,d)\cdot idf(t,D)$$
-$$f_d(t) := freqency\ of\ term\ t\ in\ document\ d$$
-$$D : corpus\ of\ documents$$
-$$|D| : number\ of\ documents\ where\ the term\ t\appears $$
-$$|d \in D : t \in d|\ :\ number\ of\ documents\ where\ the\ term\ t\ appears$$</p>
-
 <h2>
-<a id="reduce-dimensionality-single-vector-decomposition" class="anchor" href="#reduce-dimensionality-single-vector-decomposition" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Reduce dimensionality (Single Vector Decomposition)</h2>
+<a id="reduce-dimensionality-single-value-decomposition" class="anchor" href="#reduce-dimensionality-single-value-decomposition" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Reduce dimensionality (Single Value Decomposition)</h2>
 
-<p>Suppose we have m words (features) and n documents 
-Single vector decomposition (SVD) of an m*n real or complex matrix X is a factorization of the form :</p>
+<p>Suppose we have m words (features) and n documents, Single value decomposition (SVD) of an tall rectangular  m*n matrix is a factorization to orthogonal eigenvectors and eigenvalues. It's basically a PCA but without mean shifting. </p>
 
-<p>$$\mathbf{ X = U \Sigma V^{T} }$$
-$$ U\ is\ m x r\ matrix,\ columns\ of\ U\ contain\ the\ Eigenvectors\ of\ X \cdot X^{T} $$
-$$ V\ is\ an\ r x n,\ columns\ of\ V\ contain\ the\ Eigenvectors\ of\ X^{T} \cdot X $$
-$$ \Sigma\ is\ a\ diagonal\ r x r\ matrix.\ diagonal\ values\ are\ eigenvalues\ of\ X \cdot X^{T}$$</p>
-
-<p>$$\begin{bmatrix} x_{1,1} &amp; x_{1,2}  &amp; \cdots &amp; x_{1,n} \ x_{2,1}&amp; \ddots &amp; &amp; \vdots \ \vdots &amp;  &amp; \ddots &amp; \vdots \ 
- x_{m,1}&amp; \cdots &amp;  \cdots &amp; x_{m,n} \ \end{bmatrix}= \begin{bmatrix} u_{1,1} &amp; u_{1,2}  &amp; \cdots &amp; u_{1,r} \ u_{2,1}&amp; \ddots &amp; &amp; \vdots \ \vdots &amp;  &amp; \ddots &amp; \vdots \u_{m,1}&amp; \cdots &amp;  \cdots &amp; u_{m,r} \\end{bmatrix} \cdot diag \begin{bmatrix}d_{1}\\vdots \  \vdots  \  d_{r} \ \end{bmatrix}\cdot \begin{bmatrix} v_{1,1} &amp; v_{1,2}  &amp; \cdots &amp; v_{1,n} \ v_{2,1}&amp; \ddots &amp; &amp; \vdots \ \vdots &amp;  &amp; \ddots &amp; \vdots \ v_{r,1}&amp; \cdots &amp;  \cdots &amp; v_{r,n} \ \end{bmatrix}$$</p>
-
-<p>It's basically a PCA but without mean shifting.But SVD works better in SA because it is able to detect and extract small signals from noisy data. Noisy data here means words that are not significant for prediction.</p>
+<p>SVD works better in SA because it is able to detect and extract small signals from noisy data. Noisy data here means words that are not significant for prediction.</p>
 
 <p>In this context, it is known as latent semantic analysis (LSA).</p>
 
-<p>The diagonal vector <code>d</code> generated is ordered by importance of each dimension.
+<p>The diagonal vector generated is ordered by importance of each dimension.
 Let's graph a cumulative variance:  </p>
+
+<p></p><img src="http://i.imgur.com/qi8tx1v.png">
 
 <blockquote>
 <p>Design decision</p>
 
-<p>We have to decide how many dimensions to keep. Looking at the graph we can keep 10 dimensions which represent almost 99% of the features.
+<p>We have to decide how many dimensions to keep. Looking at the graph we can keep 10% dimensions which represent almost 99% of the features.
 This is curious and a puzzling choice to make. But let's aim for fast processing and later on see if adding more dimensions improves our prediction.</p>
 </blockquote>
-
-<p>In order to rotate into our new space of reduced dimensions we have to limit the number of eigenvectors in <code>U</code> then transpose it an multiply it by the original X :</p>
-
-<p>$$ \hat{X} = U^{T}\cdot X $$</p>
-
-<p>Transform it back to a dataframe and bring back the truth y</p>
-
-<p>If we consider the first 2 dimensions as predictors let's see how it looks</p>
 
 <h2>
 <a id="supervised-training" class="anchor" href="#supervised-training" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Supervised training</h2>
 
-<p>Now that we know some basic facts about our data set, 
-let's randomly split the data into training and test data. 
-We set the seed <code>set.seed(755)</code> and use <code>sample()</code> function to select 
-your test index to create two separate data frames
-called: <code>train</code> and <code>test</code> from the original <code>ratings</code> data frame. 
- <code>test</code> contains a randomly selected 20% of the rows and training the other 80%. We will 
-use these data frames to do the rest of the analyses in the problem set.</p>
+<p>As with any ML problemt, we randomly split the data into training and test data. We chose to have 80% for training and 20% for testing.
+Below is the list of algorithms we used :</p>
 
-<p>As we go along we will be comparing different approaches. Let's start by creating a benchmark table:</p>
-
-<h3>
-<a id="naive-bayes-supervised-training" class="anchor" href="#naive-bayes-supervised-training" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Naive Bayes supervised training</h3>
-
-<p>The basic idea to find the probabilities of categories given a text document by using the joint probabilities of words and categories. It is based on the assumption of word independence.
-The starting point is the Bayes theorem for conditional probability, stating that, for a given data point x and class C: </p>
-
-<p>$$P(C/x) = \frac{P(x/C) \cdot P(C)}{P(x)}$$</p>
-
-<p>By making the assumption that for a data point x = {x1,x2,…xj}, the probability of each of its attributes occurring in a given class is independent, we can estimate the probability of x as follows :</p>
-
-<p>$$P(C/x) = P(C) \cdot \prod_{j} P(x_{j}/C)$$</p>
-
-<p>Now, we can train the naive Bayes model with the training set. We'll be using e1071 package made by David Meyer from TU Wien.
-The naiveBayes function requires a </p>
-
-<h3>
-<a id="support-vector-machine" class="anchor" href="#support-vector-machine" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Support Vector Machine</h3>
-
-<p>SVMs were developed by Cortes &amp; Vapnik (1995) [1] for binary classification. Their approach may be roughly sketched as follows:</p>
+<ul>
+<li><p><strong>Naive Bayes</strong>, making the assumption that the probability of each word occurring for a given class is independent.</p></li>
+<li><p><strong>Support Vector Machine</strong> , SVMs were developed by Cortes &amp; Vapnik (1995) [1] for binary classification. Their approach may be roughly sketched as follows:</p></li>
+</ul>
 
 <blockquote>
 <p>Class separation: basically, we are looking for the optimal separating hyperplane between the two classes by maximizing the margin between the classes’ closest points —the points lying on the boundaries are called support vectors, and the middle of the margin is our optimal separating hyperplane;</p>
 </blockquote>
 
-<p>[1] : Cortes, C. &amp; Vapnik, V. (1995). Support-vector network. Machine Learning, 20, 1–25</p>
-
-<h3>
-<a id="logistic-regression" class="anchor" href="#logistic-regression" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Logistic regression</h3>
-
-<p>In the previous model we were assuming a less optimal cut-off. Let's use LDA assuming of course that our covariates are bivariate normal</p>
-
-<h3>
-<a id="cross-validation-of-logistic-regression" class="anchor" href="#cross-validation-of-logistic-regression" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Cross-Validation of Logistic Regression</h3>
-
-<h3>
-<a id="randon-forest" class="anchor" href="#randon-forest" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Randon Forest</h3>
-
-<p>The <code>randomForest</code> prediction function works similarly to decision trees</p>
+<ul>
+<li><p><strong>Logistic regression</strong></p></li>
+<li><p><strong>Random Forest</strong> where prediction function works similarly to decision trees</p></li>
+</ul>
 
 <h2>
 <a id="conclusion" class="anchor" href="#conclusion" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Conclusion</h2>
 
 <p>In this section we used a supervised machine learning approach and tried several classification models. From the table below, the algorithmic approach using randomForest gives the best accuracy. we are 25% better than flipping a coin with only a classified bag of words.</p>
 
+<table>
+<thead>
+<tr>
+<th align="left">Method</th>
+<th align="right">Accuracy</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">Naive Bayes</td>
+<td align="right">0.6670996</td>
+</tr>
+<tr>
+<td align="left">Support Vector Machine</td>
+<td align="right">0.7367965</td>
+</tr>
+<tr>
+<td align="left">Linear Discriminent Analysis</td>
+<td align="right">0.7441558</td>
+</tr>
+<tr>
+<td align="left">Random Forest</td>
+<td align="right">0.7584416</td>
+</tr>
+</tbody>
+</table>
+
 <h1>
-<a id="sentiment-lexicons-using-natural-language-processing" class="anchor" href="#sentiment-lexicons-using-natural-language-processing" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sentiment lexicons using Natural Language Processing</h1>
+<a id="part-ii--sentiment-lexicons-using-natural-language-processing" class="anchor" href="#part-ii--sentiment-lexicons-using-natural-language-processing" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>PART II : Sentiment lexicons using Natural Language Processing</h1>
+
+<hr>
 
 <h2>
-<a id="feature-extraction-and-classification" class="anchor" href="#feature-extraction-and-classification" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Feature Extraction and Classification</h2>
+<a id="background-1" class="anchor" href="#background-1" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Background</h2>
+
+<p>In the machine learning classification models based on words we've seen that many false positives originate from negations. such as "not good", "don't recommend", etc..</p>
+
+<p>In our work, we'll use the OpenNLP. Which is an API for the apache openNLP framework written in Java. openNLP requires a pre-made models. These are conveniently available to R by installing the respective <code>openNLPmodels.language</code> package from the repository at <a href="http://datacube.wu.ac.at">http://datacube.wu.ac.at</a></p>
+
+<h2>
+<a id="process" class="anchor" href="#process" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Process</h2>
+
+<p>The following flowchart depicts the proposed process for categorization using NLP</p>
+
+<p></p><img src="http://i.imgur.com/LVob7Qq.png">
+
+<h2>
+<a id="data-review" class="anchor" href="#data-review" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Data review</h2>
+
+<p>As with any text, we must do a serie of transformations :</p>
+
+<ul>
+<li>lowercase</li>
+<li>remove punctuation</li>
+<li>strip white space</li>
+</ul>
+
+<h2>
+<a id="no-brainer-classification-using-lexicons" class="anchor" href="#no-brainer-classification-using-lexicons" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>No-brainer classification using lexicons</h2>
+
+<p>Let's do a basic sentiment analysis from a categorized bag of words, we'll use the Bing lexison provided by <code>tidytext</code> package <code>sentiments</code>  :</p>
+
+<h3>
+<a id="classification" class="anchor" href="#classification" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Classification</h3>
+
+<p>The score is obtained from simply </p>
+
+
+
+<p></p><img src="http://i.imgur.com/39waWBY.png">
+
+<p>In the following figure we notice that the red and blue spaces (of +/- classes) are overlapping which explains why applying a scoring gets an accuracy of <strong>67%</strong> </p>
+
+<p></p><img src="http://i.imgur.com/sTd1rDd.png">
+
+<h3>
+<a id="evaluation-of-the-results" class="anchor" href="#evaluation-of-the-results" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Evaluation of the results</h3>
+
+<p>To find out what we can enhance, let's visualize the word distribution :</p>
+
+<p></p><img src="http://i.imgur.com/qQ4AH4i.png">
+
+<p>Many positive words like "recommended" are found in negative ratings as well. This is due to the negations and polarity inverter adjectives. For example : Not bad, would account for negative just because of the word "bad" is there.</p>
+
+<p>In the next section, we'll try to use NLP to enhance our classification.</p>
+
+<h2>
+<a id="a-more-sophisticated-classification" class="anchor" href="#a-more-sophisticated-classification" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>A more sophisticated Classification</h2>
+
+<p>In the following, we'll experiment with an 1-star rated wireless charger from Amazon. This particular review would count for a positive prediction using models that do not take into account the semantics:</p>
+
+<blockquote>
+<p><em>"Bought it in Black Friday sales for good price.I don't like it.not wanna recommend to anybody"</em></p>
+</blockquote>
+
+<h3>
+<a id="sentence-chunking-and-part-of-speech-tagging" class="anchor" href="#sentence-chunking-and-part-of-speech-tagging" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sentence chunking and Part-of-Speech tagging</h3>
 
 <p>The first step is to extract 2 types of phrases :</p>
 
@@ -293,36 +313,16 @@ The naiveBayes function requires a </p>
 <li>Noun phrases that may describe the product. Example : The design was not good""</li>
 </ul>
 
-<p>In our work, we use the OpenNLP chunker. This chunker will split a given text into a sequence of semantically correlated phrases but does not specify their internal structure, nor their role in the main sentence.</p>
-
-<p>openNLP <code>Maxent_Chunk_Annotator</code> requires a pre-made models. These are conveniently available to R by installing the respective <code>openNLPmodels.language</code> package from the repository at <a href="http://datacube.wu.ac.at">http://datacube.wu.ac.at</a></p>
-
-<p>To install English language model (a heavy download 74MB) :
-<code>install.packages("openNLPmodels.en", repos = "http://datacube.wu.ac.at")</code></p>
-
-<p>In the following, we'll experiment with a 1-star rated wireless charger from Amazon. And to evaluate this chuncker we selected a text with a lot of grammar and orthographic mistakes:</p>
-
-<p>Fix punctuation issues in this example "best.I" using <code>gsub</code> from the <code>stringr</code> package.</p>
-
-<h2>
-<a id="sentence-chunking-and-part-of-speech-tagging" class="anchor" href="#sentence-chunking-and-part-of-speech-tagging" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sentence chunking and Part-of-Speech tagging</h2>
-
 <p>The part-of-speech tags meaning is found in the <a href="https://www.ling.upenn.edu/courses/Fall_2003/ling001/penn_treebank_pos.html">Penn Treebank Project</a></p>
 
-<p>The chunk tags contain the name of the chunk type, for example I-NP for noun phrase words and I-VP for verb phrase words. Most chunk types have two types of chunk tags, B-CHUNK for the first word of the chunk and I-CHUNK for each other word in the chunk</p>
+<p><strong>Treebank of Sentence and POS tagging</strong></p>
 
-<p>Transform it to  [word, pos-tag, chunk-tag] dataframe :</p>
-
-<p>The first column contains the current word.</p>
-
-<p>The second its part-of-speech tag</p>
-
-<p>The third its chunk tag.</p>
+<p></p><img src="http://i.imgur.com/W7KG6sn.png">
 
 <h3>
 <a id="feature-identification" class="anchor" href="#feature-identification" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Feature identification</h3>
 
-<p>Now we want to identify features. For the purpose of this work we won't go for a full analysis using penn tree. Rather we'll simply identify the following words inside a verbal phrase:</p>
+<p>For the purpose of this work we won't go for a full analysis using penn treebanks. Rather we'll simply identify the following words inside a verbal and noun chunks (phrase):</p>
 
 <ul>
 <li>[VB] : verb w/ positive/negative sentiment : like, hate , etc</li>
@@ -330,18 +330,32 @@ The naiveBayes function requires a </p>
 <li>[RB] : adverb polarity inverter such as : n't, or incr/decrementers such as : too, very, more etc.</li>
 </ul>
 
-<p>First, let's use tidytext sentiments to construct such mapping table</p>
-
 <h2>
 <a id="scoring-algorithm" class="anchor" href="#scoring-algorithm" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Scoring algorithm</h2>
 
-<p>Now comes the scoring algorithm part. The idea is to find a VB or JJ and look for a surrounding RB multiplier:</p>
+<p>The idea is to find RB multiplier and look for a VB or JJ surrounding it :
+For example : n't like : will compute 1 x -1</p>
 
-<p>For example : n't like : will compute 2 x -1</p>
+<p>We should be able to calculate our sentiment score as the diff between negative and positive counts normalized by the count just like we did before.</p>
 
-<p>Now we need to wrap all above into a function </p>
+<h2>
+<a id="interpretation" class="anchor" href="#interpretation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Interpretation</h2>
 
-<p>Apply it to a number of review texts .</p>
+<p>Just as before we can plot these 2 positive and negative dimensions :</p>
+
+<p></p><img src="http://i.imgur.com/qIClfRE.png">
+
+<p>Notice how the discriminance of the 2 clusters is higher.</p>
+
+<h1>
+<a id="conclusion-1" class="anchor" href="#conclusion-1" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Conclusion</h1>
+
+<p>Some of the basic techniques of NLP can enhance the accuracy of sentiment scoring. We went from 68% to 74% with a simple identification of negation-of-adjective (NOA) and negation-of-verb (NOV). And using a randomForest algorithm we achieved nearly 78% accuracy.</p>
+
+<p>But, some language forms require a deep analysis. For example :</p>
+
+<p>Sarcasm : "Great sound when working"
+Deep inverter : "Not such a good value after all", polarity inverter adverb is 3-words faraway from its adjective.</p>
         </section>
 
         <footer>
