@@ -150,7 +150,7 @@ We objectively chose to demarcate each rating at the 2.x level divide, such that
 <h2>
 <a id="feature-extraction-from-bag-of-words" class="anchor" href="#feature-extraction-from-bag-of-words" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Feature Extraction from Bag of Words</h2>
 
-<p>Use <code>nrc</code> lexicon as a bag of words in order to remove stemsords. This dataset has sentiments but we're not going to use them for the time being. </p>
+<p>Use <code>nrc</code> lexicon as a bag of words in order to remove stem words. This dataset has sentiments but we're not going to use them for the time being. </p>
 
 <p>Let's discover the top words for both positive and negative ratings. We use the <code>wordcloud</code> package to have a nice display. </p>
 
@@ -186,7 +186,7 @@ This is curious and a puzzling choice to make. But let's aim for fast processing
 <h2>
 <a id="supervised-training" class="anchor" href="#supervised-training" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Supervised training</h2>
 
-<p>As with any ML problemt, we randomly split the data into training and test data. We chose to have 80% for training and 20% for testing.
+<p>As with any ML problem, we randomly split the data into training and test data. We chose to have 80% for training and 20% for testing.
 Below is the list of algorithms we used :</p>
 
 <ul>
@@ -225,7 +225,7 @@ Below is the list of algorithms we used :</p>
 <td align="right">0.7367965</td>
 </tr>
 <tr>
-<td align="left">Linear Discriminent Analysis</td>
+<td align="left">Linear Discriminant Analysis</td>
 <td align="right">0.7441558</td>
 </tr>
 <tr>
@@ -234,7 +234,9 @@ Below is the list of algorithms we used :</p>
 </tr>
 </tbody>
 </table>
-
+<br>
+<br>
+<br>
 <h1>
 <a id="part-ii--sentiment-lexicons-using-natural-language-processing" class="anchor" href="#part-ii--sentiment-lexicons-using-natural-language-processing" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>PART II : Sentiment lexicons using Natural Language Processing</h1>
 
@@ -245,7 +247,7 @@ Below is the list of algorithms we used :</p>
 
 <p>In the machine learning classification models based on words we've seen that many false positives originate from negations. such as "not good", "don't recommend", etc..</p>
 
-<p>In our work, we'll use the OpenNLP. Which is an API for the apache openNLP framework written in Java. openNLP requires a pre-made models. These are conveniently available to R by installing the respective <code>openNLPmodels.language</code> package from the repository at <a href="http://datacube.wu.ac.at">http://datacube.wu.ac.at</a></p>
+<p>In our work, we'll use the openNLP package. Which is an API for the apache OpenNLP framework written in Java. openNLP requires a pre-made models. These are conveniently available to R by installing the respective <code>openNLPmodels.language</code> package from the repository at <a href="http://datacube.wu.ac.at">http://datacube.wu.ac.at</a></p>
 
 <h2>
 <a id="process" class="anchor" href="#process" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Process</h2>
@@ -257,7 +259,7 @@ Below is the list of algorithms we used :</p>
 <h2>
 <a id="data-review" class="anchor" href="#data-review" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Data review</h2>
 
-<p>As with any text, we must do a serie of transformations :</p>
+<p>As with any text, we must do a series of transformations :</p>
 
 <ul>
 <li>lowercase</li>
@@ -290,7 +292,7 @@ Below is the list of algorithms we used :</p>
 
             <p align="center"><img src="images/12.png"></p>
 
-<p>Many positive words like "recommended" are found in negative ratings as well. This is due to the negations and polarity inverter adjectives. For example : Not bad, would account for negative just because of the word "bad" is there.</p>
+<p>Many positive words like "recommend" are found in negative ratings as well. This is due to the negations and polarity inverter adjectives. For example : Not bad, would account for negative just because of the word "bad" is there.</p>
 
 <p>In the next section, we'll try to use NLP to enhance our classification.</p>
 
