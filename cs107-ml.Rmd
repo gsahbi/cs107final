@@ -42,11 +42,11 @@ libs = c(
   "caret",       ##  confusion matrix
   "stringr",     ##  gsub
   "knitr",       ##  kable
-  "ggplot2",     ##  for plots
-  "dplyr",       ##  for dataframe wrangling
-  "randomForest", #  for randomForest classification
-  "e1071",       ##  for naive bayes and SVM 
-  "MASS",        ##   
+  "ggplot2",     ##  plots
+  "dplyr",       ##  dataframe wrangling
+  "randomForest", #  randomForest classification
+  "e1071",       ##  naive bayes and SVM 
+  "MASS",        ##  lda
   "wordcloud",   ##  word cloud
   "tidyr",       ##  ubiquitous
   "tidytext"     ##  tokenizer and sentiment dataset
@@ -68,13 +68,13 @@ This data-set contains product reviews and metadata from Amazon, including 142.8
 We have decided to use electronics reviews for this work. Because electronics are not perfect so create a lot of contrasted opinions.
  
 
-```{r }
+```{r}
 # TODO: Set working directory to where this script is (avoid hardcoded paths)
-this.dir <- "/mnt/hgfs/final project/cs107final/data/"
+this.dir <- "~/HES/CS107/final project/cs107final"
 setwd(this.dir)
 
 #json_file <- "data/reviews_electronics_extract.json"
-json_file <- "reviews_electronics_extract.json.gz"
+json_file <- "data/reviews_elect_50K.json.gz"
 ```
 
 The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the appropriate way of to load the data into a data frame.
@@ -82,7 +82,7 @@ The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the ap
 ```{r cache=TRUE}
 dat <- stream_in(gzfile(json_file), verbose = FALSE)
 
-#dat <- dat %>% head(2000)    ## comment after testing
+dat <- dat %>% head(50000)    ## comment after testing
 
 #Preview the result.
 glimpse(dat)
@@ -149,11 +149,8 @@ The rating system used in Amazon is as follows :
 Let's see the distribution of these ratings in our case
 
 ```{r}
-df %>%  ggplot(aes(overall)) + 
-geom_histogram(binwidth=1,
-               col="red", 
-               fill="green",
-               alpha = .2) + 
+df %>%  ggplot(aes(x=as.factor(overall))) + 
+        geom_bar(aes(fill=factor(overall))) + 
                 labs(title="Histogram for Ratings per Product") +
                 labs(x="Rating Stars", y="number of reviews") 
 
@@ -189,13 +186,10 @@ df <- df %>%
 Let's check again the distribution of opinions
 
 ```{r}
-df %>%  ggplot(aes(rating)) + 
-        geom_histogram(binwidth=1,
-               col="red", 
-               fill="green",
-               alpha = .2) + 
-labs(title="Histogram for Ratings per Product") +
-labs(x="Rating Stars", y="number of reviews") 
+df %>%  ggplot(aes(x=as.factor(rating))) + 
+        geom_bar(aes(fill=factor(rating))) + 
+labs(title="Histogram of Ratings") +
+labs(x="Class", y="number of reviews") 
 ```
 
 Even after this mapping the class proportions need to be corrected manually.
@@ -320,10 +314,13 @@ Compute tf-idf, inverse document frequency, and relative term frequency on docum
 $$tf(t,d) = \frac{f_{d}(t)}{\underset{w \in d}{max}}$$
 $$idf(t,D) = log \left (\frac{|D|}{|d \in D : t \in d|}  \right )$$
 $$tfidf(t,d,D) = tf(t,d)\cdot idf(t,D)$$
-$$f_d(t) := freqency\ of\ term\ t\ in\ document\ d$$
-$$D : corpus\ of\ documents$$
-$$|D| : number\ of\ documents\ where\ the term\ t\appears $$
-$$|d \in D : t \in d|\ :\ number\ of\ documents\ where\ the\ term\ t\ appears$$
+$f_d(t):=$ freqency of term $t$ in document $d$
+
+$D :$ corpus of documents
+
+$|D| :$ number of documents where the term $t$ appears
+
+$|d \in D : t \in d|\ :$ number of documents where the term $t$ appears
 
 ```{r}
 
@@ -402,7 +399,8 @@ In order to rotate into our new space of reduced dimensions we have to limit the
 $$ \hat{X} = U^{T}\cdot X $$
 
 ```{r}
-truncate <- 100
+## trauncate 10% of the column
+truncate <- round(0.1 * ncol(Xmat.svd$u))
 Xmat_h <- t(Xmat.svd$u[,1:truncate]) %*% Xmat
 ```
 
@@ -541,7 +539,7 @@ benchmark <- bind_rows(benchmark,
 
 ### Logistic regression
 
-```{r}
+```{r warning=FALSE}
 
 ## glm
 glm.model <- glm(y~., data=train, family=binomial)
@@ -561,8 +559,6 @@ In the previous model we were assuming a less optimal cut-off. Let's use LDA ass
 
 
 ```{r}
-
-
 lda.model <- lda(y ~ ., train)
  
 plda = predict(lda.model, newdata = test, type="response")
@@ -581,7 +577,7 @@ benchmark <- bind_rows(benchmark,
 
 ### Cross-Validation of Logistic Regression
 
-```{r}
+```{r warning=FALSE}
 
 #define training control
 train_control <- trainControl(method="cv", number=10)

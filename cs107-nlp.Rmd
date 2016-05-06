@@ -513,7 +513,7 @@ X_h %>% filter(y_hat > 0) %>% ggplot(aes(y_hat)) + geom_histogram()
 ```
 
 
-## glm on this data :
+## GLM :
 ```{r}
 ## glm
 glm.model <- glm(y~positive + negative, data=X, family=binomial)
@@ -528,7 +528,7 @@ table(X$y, glm.pred>.5)
 accuracy(X$y, glm.pred>.5)
 ```
 
-## random Forest
+## Random Forest
 
 ```{r}
 require(randomForest)
