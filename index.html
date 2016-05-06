@@ -18,6 +18,7 @@
       <div class="inner">
 
         <header>
+          <img style="float:left" src="http://i.imgur.com/wYyRKNn.png?1" alt="">
           <h1>Sentiment Analysis of Product Review</h1>
           <h2>CS107 Final Project</h2>
         </header>
@@ -31,7 +32,6 @@
         <hr>
 
         <section id="main_content">
-          <p><img src="http://i.imgur.com/wYyRKNn.png?1" alt=""></p>
 
 <h1>
 <a id="project-overview" class="anchor" href="#project-overview" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Project Overview</h1>
@@ -43,7 +43,7 @@
 
 <p>Sentiment Analysis, is receiving a big attention these days, because of its huge spectrum of applications ranging from product review analysis, campaign feedback, competition bench-marking, customer profiles, political trends, etc...</p>
 
-<p></p><img src="http://i.imgur.com/hFwQEH3.jpg?1">
+<p align="center"><img src="images/2.jpeg"></p>
 
 <p>There is a huge flow of information going through the internet and social networks. Online discussions are only relevant to people for a couple of days. Nobody actually goes in past to tweets that are older than maybe a week, for instance. This entire humanity archive of discussion could help in many applications if we train machines to understand the sentiment of people towards a specific theme at a specific time. </p>
 
@@ -93,7 +93,7 @@
 
 <p>Let's look at at the the number of ratings per product : </p>
 
-<p></p><img src="http://i.imgur.com/hNUYmi9.png">
+            <p align="center"><img src="images/3.png"></p>
 
 <p>It's quite skewed with some extreme best sellers (a headphone from Koss) having 3000 reviews. </p>
 
@@ -117,7 +117,7 @@
 
 <p>Let's see the distribution of these ratings in our case</p>
 
-<p></p><img src="http://i.imgur.com/0kfA4Fr.png">
+            <p align="center"><img src="images/4.png"></p>
 
 <blockquote>
 <p>The ratings are very skewed towards positive feedback. Which is an indication that Amazon is not selling junk at least but it's not going to help in our modeling. We have to have equal likelihood of each class of the ratings. </p>
@@ -133,7 +133,7 @@ We objectively chose to demarcate each rating at the 2.x level divide, such that
 
 <p>So at the end we'll have only 2 opinions : negative/positive</p>
 
-<p></p><img src="http://i.imgur.com/gkeTY7a.png">
+            <p align="center"><img src="images/5.png"></p>
 
 <h1>
 <a id="part-i---machine-learning-classification" class="anchor" href="#part-i---machine-learning-classification" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>PART I :  Machine Learning Classification</h1>
@@ -143,7 +143,7 @@ We objectively chose to demarcate each rating at the 2.x level divide, such that
 <h2>
 <a id="bag-of-words" class="anchor" href="#bag-of-words" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bag of Words</h2>
 
-<p></p><img src="http://i.imgur.com/r430Fjd.jpg?1">
+            <p align="center"><img src="images/6.png"></p>
 
 <p>One of the simplest things to do is to treat each text as a "bag of words". We have used the <code>tm</code> package in order to construct a Term Document Matrix but our machine couldn't handle such huge number of dimensions. So let's go simpler with <code>tidytext</code>. I fact we found that R as a framework is not as rich as Python Scikit in NLP. </p>
 
@@ -154,7 +154,7 @@ We objectively chose to demarcate each rating at the 2.x level divide, such that
 
 <p>Let's discover the top words for both positive and negative ratings. We use the <code>wordcloud</code> package to have a nice display. </p>
 
-<p></p><img src="http://i.imgur.com/gfHc6rd.png">
+            <p align="center"><img src="images/7.png"></p>
 
 <h2>
 <a id="tf-idf" class="anchor" href="#tf-idf" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>TF-IDF</h2>
@@ -174,7 +174,7 @@ So a tf-idf value represents the term's relative importance within a document.</
 <p>The diagonal vector generated is ordered by importance of each dimension.
 Let's graph a cumulative variance:  </p>
 
-<p></p><img src="http://i.imgur.com/qi8tx1v.png">
+            <p align="center"><img src="images/8.png"></p>
 
 <blockquote>
 <p>Design decision</p>
@@ -252,7 +252,7 @@ Below is the list of algorithms we used :</p>
 
 <p>The following flowchart depicts the proposed process for categorization using NLP</p>
 
-<p></p><img src="http://i.imgur.com/LVob7Qq.png">
+            <p align="center"><img src="images/9.png"></p>
 
 <h2>
 <a id="data-review" class="anchor" href="#data-review" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Data review</h2>
@@ -277,18 +277,18 @@ Below is the list of algorithms we used :</p>
 
 
 
-<p></p><img src="http://i.imgur.com/39waWBY.png">
+            <p align="center"><img src="images/10.png"></p>
 
 <p>In the following figure we notice that the red and blue spaces (of +/- classes) are overlapping which explains why applying a scoring gets an accuracy of <strong>67%</strong> </p>
 
-<p></p><img src="http://i.imgur.com/sTd1rDd.png">
+            <p align="center"><img src="images/11.png"></p>
 
 <h3>
 <a id="evaluation-of-the-results" class="anchor" href="#evaluation-of-the-results" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Evaluation of the results</h3>
 
 <p>To find out what we can enhance, let's visualize the word distribution :</p>
 
-<p></p><img src="http://i.imgur.com/qQ4AH4i.png">
+            <p align="center"><img src="images/12.png"></p>
 
 <p>Many positive words like "recommended" are found in negative ratings as well. This is due to the negations and polarity inverter adjectives. For example : Not bad, would account for negative just because of the word "bad" is there.</p>
 
@@ -317,7 +317,7 @@ Below is the list of algorithms we used :</p>
 
 <p><strong>Treebank of Sentence and POS tagging</strong></p>
 
-<p></p><img src="http://i.imgur.com/W7KG6sn.png">
+            <p align="center"><img src="images/14.png"></p>
 
 <h3>
 <a id="feature-identification" class="anchor" href="#feature-identification" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Feature identification</h3>
@@ -343,7 +343,7 @@ For example : n't like : will compute 1 x -1</p>
 
 <p>Just as before we can plot these 2 positive and negative dimensions :</p>
 
-<p></p><img src="http://i.imgur.com/qIClfRE.png">
+            <p align="center"><img src="images/15.png"></p>
 
 <p>Notice how the discriminance of the 2 clusters is higher.</p>
 
