@@ -58,7 +58,7 @@ this.dir <- "/mnt/hgfs/final project/cs107final/"
 setwd(this.dir)
 
 #json_file <- "data/reviews_electronics_extract.json"
-json_file <- "data/reviews_electronics_extract.json.gz"
+json_file <- "data/reviews_elect_50K.json.gz"
 ```
 
 The file format is **NDJSON** (Newline Delimited JSON), So `stream_in` is the appropriate way of to load the data into a data frame.

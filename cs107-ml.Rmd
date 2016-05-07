@@ -6,6 +6,7 @@ output:
   html_document:
     toc: true
     number_sections: true
+    highlight: tango
 ---
 
 ```{r setup, include=FALSE}
@@ -73,7 +74,7 @@ We have decided to use electronics reviews for this work. Because electronics ar
 this.dir <- "~/HES/CS107/final project/cs107final"
 setwd(this.dir)
 
-#json_file <- "data/reviews_electronics_extract.json"
+json_file <- "data/reviews_electronics_extract.json"
 json_file <- "data/reviews_elect_50K.json.gz"
 ```
 
@@ -359,7 +360,7 @@ It's basically a PCA but without mean shifting.But SVD works better in SA becaus
 
 In this context, it is known as latent semantic analysis (LSA).
 
-```{r}
+```{r cache=T}
 # we transpose id because we want docunent as 
 Xmat <- t(as.matrix(Xdf))
 dim(Xmat)
@@ -369,7 +370,7 @@ sprintf("Matrix sparsity = %.2f%%", 100*(1- sum(Xmat > 0) / length(Xmat)))
 
 # call svd on this matrix
 Xmat.svd <- svd(Xmat, LINPACK=T)
-save(Xmat.svd, file=paste(this.dir, "Xmat.svd", ".RData", sep=""))
+#save(Xmat.svd, file=paste(this.dir, "Xmat.svd", ".RData", sep=""))
 #load(paste(this.dir, 'Xmat.svd', '.RData', sep=''))
 
 sprintf("U matrix dimension is: %dx%d", dim(Xmat.svd$u)[1], dim(Xmat.svd$u)[2])
